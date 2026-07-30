@@ -45,14 +45,19 @@
 
 完了条件は仕様書 29 節。
 
-### 1-A データソース接続 — 未着手（環境制約、DECISIONS.md D-016）
-> この開発環境はパッケージレジストリ以外への外向き接続を遮断しており、arXiv と OpenAlex に一度も到達できません。実レスポンスに対して動かせないコードを完了扱いにしないため、次のスライスに送っています。実装時は記録済みレスポンス（Atom XML / OpenAlex JSON）に対するオフラインテストを本体とし、疎通確認は手動手順として残します。
+### 1-A データソース接続 — 実装済み。疎通のみ未確認（DECISIONS.md D-016 / D-025）
+> この開発環境はパッケージレジストリ以外への外向き接続を遮断しており、arXiv と OpenAlex に一度も到達できません（proxy が CONNECT を拒否）。そのため **パーサとクライアントは記録形状のレスポンスに対して完成させ、実 API への疎通だけを opt-in テストに切り出しています**。`PAPERMATCH_LIVE_PROVIDERS=1 pytest -m live` で、外向き接続のある環境から疎通を確認してください。fixture は公開スキーマから手で起こしたもので、構造は本物・中身は合成です（各ファイル冒頭に明記）。
 
-- [ ] `ArxivPaperProvider`（Atom API、レート制限、`arXiv:` 識別子、カテゴリ→分野マッピング）
-- [ ] `OpenAlexPaperProvider`（候補発見、OA 状態、著者、識別子統合）
-- [ ] Provider ごとのサーキットブレーカーとキャッシュ（仕様書 25 節）
+- [x] `ArxivPaperProvider`（Atom API、3 秒間隔のレート制限、`arXiv:` 識別子、カテゴリ→分野マッピング、
+      DOI 優先の canonical id、版番号の保持、journal_ref による published 判定）
+- [x] `OpenAlexPaperProvider`（inverted index からの Abstract 復元、OA 状態、著者と ORCID、
+      識別子統合、cursor ページング、論文ごとのライセンス判定）
+- [x] Provider ごとのサーキットブレーカーとレート制限（仕様書 25 節）— `providers/http.py`。
+      429 / 5xx はブレーカーを開き、それ以外の 4xx は開かない（自分側のクエリ不備で Provider を落とさない）
+- [x] ライセンスの立場を明文化し、レコードに根拠 URL を同梱（DECISIONS.md D-025）
+- [ ] **実 API への疎通確認**（`-m live`。この環境では実行不可）
 - [ ] 取り込み worker（定期実行、撤回・版更新の同期）
-- [ ] 実データ 100 件以上でフィードが構成できることの確認（仕様書 29 節）
+- [ ] 実データ 100 件以上でフィードが構成できることの確認（仕様書 29 節）— worker と疎通が前提
 
 ### 1-B フィード API ✅
 - [x] `GET /feed?mode=discover&cursor=` — 70/20/10 の枠配分、表示履歴による除外、推薦理由の付与
@@ -183,11 +188,12 @@ AI が要る項目は環境制約で未着手です（DECISIONS.md D-024）。
 | 項目 | 状況 |
 | --- | --- |
 | TypeScript の lint | tsc のみ。ESLint / Prettier は Phase 1-D で導入 |
-| 実データ Provider | Phase 1-A。環境がネットワークを遮断（DECISIONS.md D-016） |
+| 実データ Provider | 実装済み。実 API への疎通のみ未確認（`-m live`、DECISIONS.md D-016 / D-025） |
+| 取り込み worker | 未実装。Provider は繋がるが、定期取り込みと撤回・版更新の同期がまだない |
 | web での文タップ選択 | RNGH の web 実装がポインタを横取り。出荷対象外だが実機確認は必要 |
 | Discover の下スワイプ | 「Before you read」は Phase 2。現状は無反応 |
 | モバイルの E2E | Phase 1-D（Maestro）。Phase 0 の E2E は API レベル |
 | pgvector 列 | Phase 3（DECISIONS.md D-006） |
-| レート制限 | 未実装。実 Provider を繋ぐ Phase 1-A と同時に入れる |
+| レート制限 | Provider 側は実装済み（`providers/http.py`）。API 側の呼び出し元制限は未実装 |
 | 観測性 | 構造化ログ・トレース・Provider レイテンシ指標は Phase 1-A |
 | AI 説明・実翻訳 | 環境がネットワークを遮断（DECISIONS.md D-024）。interface は Phase 0 から存在 |

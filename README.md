@@ -36,9 +36,27 @@
 - **個人用学術英語辞典** — 翻訳シートから表現を保存。単語 / 連語 / 構文 / 一文 を自動判定し、出典の文をそのまま文脈として残します。
 - **Learn タブと復習** — 数日後に 1 件ずつ再提示。答えは「わかった / もう一度」の 2 択のみで、点数も連続記録もありません（DECISIONS.md D-023）。
 
+## 実データ Provider（arXiv / OpenAlex）
+
+`PAPERMATCH_PAPER_PROVIDER` で切り替えます。既定は `mock`（サンプルコーパス）です。
+
+```bash
+PAPERMATCH_PAPER_PROVIDER=arxiv     make api   # arXiv Atom API
+PAPERMATCH_PAPER_PROVIDER=openalex  make api   # OpenAlex works API
+PAPERMATCH_OPENALEX_MAILTO=you@example.org     # 任意。OpenAlex の polite pool に入ります
+```
+
+- **レート制限とサーキットブレーカー**は Provider 側にあります（`providers/http.py`）。arXiv は公表値どおり 3 秒間隔、OpenAlex は 200ms 間隔。連続失敗でブレーカーが開き、`GET /health` がどの Provider がなぜ落ちているかを個別に返します。429 と 5xx はブレーカーを開きますが、それ以外の 4xx は開きません（こちら側のクエリ不備で Provider 全体を止めないため）。
+- **ライセンス**は各レコードに `licenseId` と根拠 URL を同梱します。判別できないライセンスは推測せず、その Abstract を取り込みません（[`DECISIONS.md`](./DECISIONS.md) D-025）。
+- **疎通確認は opt-in テストです。** この環境は外向き接続が遮断されているため、パーサは記録形状の fixture に対して完成させ、実 API に触るテストだけを分離しました。ネットワークのある環境で:
+
+```bash
+cd apps/api && PAPERMATCH_LIVE_PROVIDERS=1 ./.venv/bin/pytest -m live -v
+```
+
 ### まだ無いもの
 
-arXiv / OpenAlex への実接続（Phase 1-A、この環境ではネットワークが遮断されているため未着手 — [`DECISIONS.md`](./DECISIONS.md) D-016）、実翻訳 Provider と AI 説明（同じくネットワーク制約 — D-024）、Maestro による E2E、数式カード、Knowledge Canvas。着手順は [`TASKS.md`](./TASKS.md) にあります。
+取り込み worker（定期実行、撤回・版更新の同期）と実 API への疎通確認（上記 `-m live`、この環境では実行不可 — [`DECISIONS.md`](./DECISIONS.md) D-016）、実翻訳 Provider と AI 説明（同じくネットワーク制約 — D-024）、Maestro による E2E、数式カード、Knowledge Canvas。着手順は [`TASKS.md`](./TASKS.md) にあります。
 
 ---
 

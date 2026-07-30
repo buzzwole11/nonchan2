@@ -37,6 +37,14 @@ class Settings(BaseSettings):
     paper_provider: str = "mock"
     translation_provider: str = "mock"
 
+    #: Sent on every outbound request. Spec section 21 asks that provider terms and
+    #: acknowledgements be respected, and arXiv asks callers to identify themselves.
+    provider_user_agent: str = (
+        "PaperMatch/0.1 (+https://github.com/buzzwole11/nonchan2; research reading app)"
+    )
+    #: OpenAlex offers a faster "polite pool" to callers who supply a contact address.
+    openalex_mailto: str | None = None
+
     fixtures_dir: Path = Field(default=REPO_ROOT / "fixtures")
 
     cors_allow_origins: list[str] = Field(default_factory=lambda: ["http://localhost:8081"])

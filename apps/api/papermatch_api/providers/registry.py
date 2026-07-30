@@ -11,15 +11,21 @@ from functools import lru_cache
 from typing import TypeVar
 
 from papermatch_api.config import Settings, get_settings
+from papermatch_api.providers.arxiv import ArxivPaperProvider
 from papermatch_api.providers.base import PaperProvider, ProviderHealth, TranslationProvider
 from papermatch_api.providers.mock_paper import MockPaperProvider
 from papermatch_api.providers.mock_translation import MockTranslationProvider
+from papermatch_api.providers.openalex import OpenAlexPaperProvider
 
 PaperProviderFactory = Callable[[Settings], PaperProvider]
 TranslationProviderFactory = Callable[[Settings], TranslationProvider]
 
 PAPER_PROVIDERS: dict[str, PaperProviderFactory] = {
     "mock": lambda settings: MockPaperProvider(settings.fixtures_dir),
+    "arxiv": lambda settings: ArxivPaperProvider(user_agent=settings.provider_user_agent),
+    "openalex": lambda settings: OpenAlexPaperProvider(
+        user_agent=settings.provider_user_agent, mailto=settings.openalex_mailto
+    ),
 }
 
 TRANSLATION_PROVIDERS: dict[str, TranslationProviderFactory] = {

@@ -13,13 +13,13 @@ dependencies = [
     "pydantic-settings>=2.6.0",
     "pyjwt>=2.9.0",
     "python-multipart>=0.0.12",
+    "httpx>=0.27.2",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.3.3",
     "pytest-cov>=6.0.0",
-    "httpx>=0.27.2",
     "ruff>=0.7.3",
     "mypy>=1.13.0",
 ]
@@ -37,6 +37,7 @@ addopts = "-q"
 markers = [
     "integration: requires a live PostgreSQL database",
     "e2e: end-to-end flow across the HTTP API and the database",
+    "live: reaches a real external API; skipped unless PAPERMATCH_LIVE_PROVIDERS=1",
 ]
 
 [tool.ruff]
