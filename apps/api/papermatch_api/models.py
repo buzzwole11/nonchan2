@@ -22,6 +22,7 @@ from typing import Any
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -29,6 +30,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Sequence,
     String,
     Text,
     UniqueConstraint,
@@ -355,6 +357,11 @@ class Impression(Base):
     dwell_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
+#: Backs ``Action.sequence``. Declared at module level so Alembic emits the CREATE
+#: SEQUENCE alongside the table.
+ACTION_SEQUENCE = Sequence("actions_sequence_seq")
+
+
 class Action(Base):
     """User actions, including the undo that reverses one (spec section 6)."""
 
@@ -362,9 +369,21 @@ class Action(Base):
     __table_args__ = (
         vocab_check("action_type", "actionType"),
         Index("ix_actions_user_created", "user_id", "created_at"),
+        Index("ix_actions_user_sequence", "user_id", "sequence"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UuidType, primary_key=True, default=_uuid)
+    #: Insertion order, and the only sound way to ask "what was the last action?".
+    #: ``created_at`` uses ``now()``, which is the *transaction* clock in PostgreSQL, so
+    #: two actions written in one request share a timestamp and cannot be ordered — and
+    #: Undo has to know exactly which one it is reversing (spec section 6).
+    sequence: Mapped[int] = mapped_column(
+        BigInteger,
+        ACTION_SEQUENCE,
+        server_default=ACTION_SEQUENCE.next_value(),
+        nullable=False,
+        unique=True,
+    )
     user_id: Mapped[uuid.UUID] = mapped_column(
         UuidType, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )

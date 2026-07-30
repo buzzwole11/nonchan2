@@ -10,11 +10,24 @@
  * cache) from an *API* failure (a 4xx the caller must handle).
  */
 import type {
+  ActionResponse,
   AuthTokenResponse,
+  CreateActionRequest,
+  CreateImpressionsRequest,
+  CreateImpressionsResponse,
+  FeedResponse,
   FieldsResponse,
   HealthResponse,
+  Interest,
   PaperListResponse,
+  SavePaperRequest,
+  SavedListQuery,
+  SavedListResponse,
+  SavedPaperResponse,
+  UndoResponse,
+  UpdateSavedRequest,
   User,
+  UserSettings,
 } from '@papermatch/shared-types';
 
 export class ApiError extends Error {
@@ -139,9 +152,79 @@ export class ApiClient {
     return this.request<FieldsResponse>('/fields');
   }
 
-  papers(params: { limit?: number; cursor?: string; fieldId?: string } = {}): Promise<PaperListResponse> {
+  papers(
+    params: { limit?: number; cursor?: string; fieldId?: string } = {},
+  ): Promise<PaperListResponse> {
     return this.request<PaperListResponse>('/papers', {
       query: { limit: params.limit, cursor: params.cursor, field_id: params.fieldId },
     });
+  }
+
+  updateSettings(settings: Partial<UserSettings>): Promise<User> {
+    return this.request<User>('/me/settings', { method: 'PATCH', body: settings });
+  }
+
+  updateInterests(interests: Interest[]): Promise<User> {
+    return this.request<User>('/me/interests', { method: 'PUT', body: { interests } });
+  }
+
+  // -- discover ------------------------------------------------------------------
+
+  feed(params: { limit?: number; cursor?: string } = {}): Promise<FeedResponse> {
+    return this.request<FeedResponse>('/feed', {
+      query: { mode: 'discover', limit: params.limit, cursor: params.cursor },
+    });
+  }
+
+  /**
+   * Report that cards reached the screen. Fire-and-forget from the caller's point of
+   * view, but the promise is returned so an offline queue can retry it — a lost
+   * impression means a card the user already saw comes back (spec section 16).
+   */
+  recordImpressions(body: CreateImpressionsRequest): Promise<CreateImpressionsResponse> {
+    return this.request<CreateImpressionsResponse>('/impressions', {
+      method: 'POST',
+      body,
+    });
+  }
+
+  recordAction(body: CreateActionRequest): Promise<ActionResponse> {
+    return this.request<ActionResponse>('/actions', { method: 'POST', body });
+  }
+
+  undoAction(actionId: string): Promise<UndoResponse> {
+    return this.request<UndoResponse>(`/actions/${actionId}/undo`, { method: 'POST' });
+  }
+
+  /** What the Undo control would reverse, or null when there is nothing to undo. */
+  undoableAction(): Promise<ActionResponse | null> {
+    return this.request<ActionResponse | null>('/actions/undoable');
+  }
+
+  // -- saved ---------------------------------------------------------------------
+
+  saved(query: SavedListQuery = {}): Promise<SavedListResponse> {
+    return this.request<SavedListResponse>('/saved', {
+      query: {
+        status: query.status,
+        reason: query.reason,
+        fieldId: query.fieldId,
+        sort: query.sort,
+        limit: query.limit,
+        cursor: query.cursor,
+      },
+    });
+  }
+
+  savePaper(paperId: string, body: SavePaperRequest = {}): Promise<SavedPaperResponse> {
+    return this.request<SavedPaperResponse>(`/saved/${paperId}`, { method: 'POST', body });
+  }
+
+  updateSaved(paperId: string, body: UpdateSavedRequest): Promise<SavedPaperResponse> {
+    return this.request<SavedPaperResponse>(`/saved/${paperId}`, { method: 'PATCH', body });
+  }
+
+  removeSaved(paperId: string): Promise<void> {
+    return this.request<void>(`/saved/${paperId}`, { method: 'DELETE' });
   }
 }

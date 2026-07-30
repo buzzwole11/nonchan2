@@ -76,10 +76,15 @@ def test_no_schema_drift_between_models_and_migrations(migrated_engine) -> None:
     )
 
 
-def test_the_migration_records_its_revision(migrated_engine) -> None:  # type: ignore[no-untyped-def]
+def test_the_database_is_stamped_at_the_head_revision(migrated_engine) -> None:  # type: ignore[no-untyped-def]
+    """Compared against the script directory rather than a hardcoded id, so adding a
+    migration does not require editing this test."""
+    from alembic.script import ScriptDirectory
+
+    head = ScriptDirectory.from_config(_alembic_config(MIGRATION_DB_URL)).get_current_head()
     with migrated_engine.connect() as connection:
         revision = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-    assert revision == "0001_initial"
+    assert revision == head
 
 
 def test_downgrade_to_base_leaves_no_application_tables(migrated_engine) -> None:  # type: ignore[no-untyped-def]

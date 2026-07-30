@@ -306,6 +306,140 @@ class HealthResponse(CamelModel):
     database: DatabaseHealthOut
 
 
+# ----------------------------------------------------------------------------- feed
+
+
+class FeedItemOut(CamelModel):
+    paper: PaperOut
+    #: Vocabulary values from `feedReason` (spec section 6).
+    reasons: list[str]
+    #: Already localised short sentence. Never a bare score.
+    reason_text: str
+    position: int
+    #: Which of the 70/20/10 pools this card came from (spec section 16).
+    pool: str
+    #: Score components, so a surprising ranking can be explained rather than guessed at.
+    score_breakdown: dict[str, float]
+
+
+class FeedResponse(CamelModel):
+    items: list[FeedItemOut]
+    next_cursor: str | None = None
+    #: True when a provider was unavailable and this page is served from cache.
+    degraded: bool = False
+
+
+# ---------------------------------------------------------------------------- saved
+
+
+class SavedPaperOut(CamelModel):
+    paper_id: uuid.UUID
+    reasons: list[str]
+    status: str
+    priority: int
+    notes: str | None
+    saved_at: datetime
+    last_visited_at: datetime | None
+
+
+class SavedEntryOut(CamelModel):
+    saved_paper: SavedPaperOut
+    paper: PaperOut
+
+
+class SavedListResponse(CamelModel):
+    saved: list[SavedEntryOut]
+    next_cursor: str | None = None
+    total: int
+
+
+class SavePaperRequest(CamelModel):
+    reasons: list[str] = Field(default_factory=list, max_length=10)
+    notes: str | None = Field(default=None, max_length=4000)
+
+    @field_validator("reasons")
+    @classmethod
+    def _valid_reasons(cls, value: list[str]) -> list[str]:
+        for reason in value:
+            if not vocab.is_valid("saveReason", reason):
+                raise ValueError(f"must be one of: {', '.join(vocab.values('saveReason'))}")
+        return value
+
+
+class UpdateSavedRequest(CamelModel):
+    status: str | None = None
+    reasons: list[str] | None = Field(default=None, max_length=10)
+    notes: str | None = Field(default=None, max_length=4000)
+    priority: int | None = Field(default=None, ge=0, le=100)
+
+    _v_status = field_validator("status")(_in_vocab("savedStatus"))
+
+    @field_validator("reasons")
+    @classmethod
+    def _valid_reasons(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return None
+        for reason in value:
+            if not vocab.is_valid("saveReason", reason):
+                raise ValueError(f"must be one of: {', '.join(vocab.values('saveReason'))}")
+        return value
+
+
+class SavedPaperResponse(CamelModel):
+    saved_paper: SavedPaperOut
+    paper: PaperOut
+
+
+# ------------------------------------------------------------------ impressions/actions
+
+
+class ImpressionIn(CamelModel):
+    paper_id: uuid.UUID
+    position: int = Field(default=0, ge=0)
+    feed_context: str = Field(default="discover", max_length=64)
+    dwell_ms: int | None = Field(default=None, ge=0, le=86_400_000)
+
+
+class CreateImpressionsRequest(CamelModel):
+    impressions: list[ImpressionIn] = Field(min_length=1, max_length=100)
+
+
+class CreateImpressionsResponse(CamelModel):
+    recorded: int
+
+
+class CreateActionRequest(CamelModel):
+    type: str
+    paper_id: uuid.UUID | None = None
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+    _v_type = field_validator("type")(_in_vocab("actionType"))
+
+
+class ActionOut(CamelModel):
+    id: uuid.UUID
+    type: str
+    paper_id: uuid.UUID | None
+    created_at: datetime
+    undone: bool
+    undoes_action_id: uuid.UUID | None
+    payload: dict[str, Any]
+
+
+class ActionResponse(CamelModel):
+    action: ActionOut
+    #: Present when the action changed the saved library, so the client can update it
+    #: without a second request.
+    saved: SavedPaperOut | None = None
+
+
+class UndoResponse(CamelModel):
+    undo: ActionOut
+    undone_action_id: uuid.UUID
+    #: The paper is eligible for the feed again; the client can re-insert the card.
+    restored_paper_id: uuid.UUID | None
+
+
 # ---------------------------------------------------------------------------- error
 
 

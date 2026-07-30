@@ -8,13 +8,20 @@
 import type {
   FeedItem,
   Interest,
+  Iso8601,
   Paper,
   SavedPaper,
   Translation,
   User,
   UserSettings,
 } from './models.ts';
-import type { SaveReason, SavedStatus, TranslationStage, TranslationStyle } from './vocab.ts';
+import type {
+  ActionType,
+  SaveReason,
+  SavedStatus,
+  TranslationStage,
+  TranslationStyle,
+} from './vocab.ts';
 
 /** Uniform error body for every non-2xx response. */
 export interface ApiError {
@@ -71,6 +78,53 @@ export interface FeedResponse {
   degraded: boolean;
 }
 
+// ------------------------------------------------------------- impressions and actions
+
+export interface ImpressionIn {
+  paperId: string;
+  position?: number;
+  feedContext?: string;
+  /** Reported when the card leaves the screen; feeds the re-injection rule (section 16). */
+  dwellMs?: number | null;
+}
+
+export interface CreateImpressionsRequest {
+  impressions: ImpressionIn[];
+}
+
+export interface CreateImpressionsResponse {
+  recorded: number;
+}
+
+export interface CreateActionRequest {
+  type: ActionType;
+  paperId?: string | null;
+  payload?: Record<string, unknown>;
+}
+
+export interface ActionOut {
+  id: string;
+  type: ActionType;
+  paperId: string | null;
+  createdAt: Iso8601;
+  undone: boolean;
+  undoesActionId: string | null;
+  payload: Record<string, unknown>;
+}
+
+export interface ActionResponse {
+  action: ActionOut;
+  /** Present when the action changed the saved library. */
+  saved: SavedPaper | null;
+}
+
+export interface UndoResponse {
+  undo: ActionOut;
+  undoneActionId: string;
+  /** Eligible for the feed again, so the client can put the card back on the deck. */
+  restoredPaperId: string | null;
+}
+
 export interface CreateTranslationRequest {
   paperId: string;
   selection: { field: 'abstract' | 'title'; start: number; end: number; exactText: string };
@@ -82,14 +136,48 @@ export interface CreateTranslationResponse {
   translation: Translation;
 }
 
+export interface SavedEntry {
+  savedPaper: SavedPaper;
+  paper: Paper;
+}
+
 export interface SavedListResponse {
-  saved: Array<{ savedPaper: SavedPaper; paper: Paper }>;
+  saved: SavedEntry[];
   nextCursor: string | null;
+  /** Total matching the filters, not just this page — the Library shows a count. */
+  total: number;
+}
+
+/** Sort keys for the Library View (spec section 14: 並べ替え). */
+export const SAVED_SORT_KEYS = [
+  'recently_saved',
+  'recently_visited',
+  'year',
+  'reading_time',
+  'english_level',
+  'math_density',
+  'unread_first',
+] as const;
+
+export type SavedSortKey = (typeof SAVED_SORT_KEYS)[number];
+
+export interface SavedListQuery {
+  status?: SavedStatus;
+  reason?: SaveReason;
+  fieldId?: string;
+  sort?: SavedSortKey;
+  limit?: number;
+  cursor?: string;
 }
 
 export interface SavePaperRequest {
   reasons?: SaveReason[];
   notes?: string | null;
+}
+
+export interface SavedPaperResponse {
+  savedPaper: SavedPaper;
+  paper: Paper;
 }
 
 export interface UpdateSavedRequest {

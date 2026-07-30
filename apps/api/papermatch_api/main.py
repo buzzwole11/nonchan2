@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse
 
 from papermatch_api import __version__
 from papermatch_api.config import get_settings
-from papermatch_api.routers import auth, fields, health, papers, translations
+from papermatch_api.routers import auth, feed, fields, health, papers, saved, translations
 from papermatch_api.schemas import error_response
 
 logger = logging.getLogger("papermatch")
@@ -85,7 +85,15 @@ def create_app() -> FastAPI:
             headers=exc.headers,
         )
 
-    for router in (health.router, auth.router, fields.router, papers.router, translations.router):
+    for router in (
+        health.router,
+        auth.router,
+        fields.router,
+        papers.router,
+        feed.router,
+        saved.router,
+        translations.router,
+    ):
         app.include_router(router)
 
     return app

@@ -107,6 +107,96 @@ describe('ApiClient', () => {
     await expect(client.health()).rejects.toBeInstanceOf(NetworkError);
   });
 
+  it('asks the feed for the discover mode explicitly', async () => {
+    let url = '';
+    const client = new ApiClient({
+      baseUrl: 'http://api.test',
+      fetchImpl: async (requested) => {
+        url = String(requested);
+        return jsonResponse(200, { items: [], nextCursor: null, degraded: false });
+      },
+    });
+
+    await client.feed({ limit: 20 });
+    expect(url).toContain('mode=discover');
+    expect(url).toContain('limit=20');
+  });
+
+  it('posts impressions as a batch', async () => {
+    let body: unknown;
+    const client = new ApiClient({
+      baseUrl: 'http://api.test',
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse((init as RequestInit).body as string);
+        return jsonResponse(201, { recorded: 2 });
+      },
+    });
+
+    const result = await client.recordImpressions({
+      impressions: [{ paperId: 'a', position: 0 }, { paperId: 'b', position: 1, dwellMs: 4200 }],
+    });
+
+    expect(result.recorded).toBe(2);
+    expect(body).toEqual({
+      impressions: [{ paperId: 'a', position: 0 }, { paperId: 'b', position: 1, dwellMs: 4200 }],
+    });
+  });
+
+  it('undoes by action id', async () => {
+    let url = '';
+    let method = '';
+    const client = new ApiClient({
+      baseUrl: 'http://api.test',
+      fetchImpl: async (requested, init) => {
+        url = String(requested);
+        method = (init as RequestInit).method ?? 'GET';
+        return jsonResponse(201, {
+          undo: { id: 'u1', type: 'undo' },
+          undoneActionId: 'a1',
+          restoredPaperId: 'p1',
+        });
+      },
+    });
+
+    const result = await client.undoAction('a1');
+    expect(url).toBe('http://api.test/actions/a1/undo');
+    expect(method).toBe('POST');
+    expect(result.restoredPaperId).toBe('p1');
+  });
+
+  it('returns null when there is nothing to undo', async () => {
+    const client = new ApiClient({
+      baseUrl: 'http://api.test',
+      fetchImpl: async () => jsonResponse(200, null),
+    });
+    await expect(client.undoableAction()).resolves.toBeNull();
+  });
+
+  it('handles a 204 from removing a saved paper', async () => {
+    const client = new ApiClient({
+      baseUrl: 'http://api.test',
+      fetchImpl: async () =>
+        ({ ok: true, status: 204, statusText: 'No Content' }) as unknown as Response,
+    });
+    await expect(client.removeSaved('p1')).resolves.toBeUndefined();
+  });
+
+  it('passes saved-library filters through as query parameters', async () => {
+    let url = '';
+    const client = new ApiClient({
+      baseUrl: 'http://api.test',
+      fetchImpl: async (requested) => {
+        url = String(requested);
+        return jsonResponse(200, { saved: [], nextCursor: null, total: 0 });
+      },
+    });
+
+    await client.saved({ status: 'unread', reason: 'math', sort: 'year', limit: 20 });
+    expect(url).toContain('status=unread');
+    expect(url).toContain('reason=math');
+    expect(url).toContain('sort=year');
+  });
+
   it('distinguishes a NetworkError from an ApiError', async () => {
     const failing = new ApiClient({
       baseUrl: 'http://api.test',

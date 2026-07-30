@@ -323,12 +323,20 @@ export interface ReviewEvent {
   createdAt: Iso8601;
 }
 
+/** Which of the 70/20/10 pools a card was drawn from (spec section 16). */
+export type FeedPool = 'matched' | 'adjacent' | 'exploration';
+
 /** Section 6: the card shows why it was recommended, in words. */
 export interface FeedItem {
   paper: Paper;
   reasons: FeedReason[];
   /** Short human-readable sentence, already localised by the API. */
   reasonText: string;
-  score: number;
   position: number;
+  pool: FeedPool;
+  /**
+   * Score components. Present so a surprising ranking can be explained; the UI shows
+   * `reasonText`, never these numbers (spec section 6: 単一の不透明なスコアだけを見せない).
+   */
+  scoreBreakdown: Record<string, number>;
 }
