@@ -102,8 +102,14 @@ export function OnboardingStep({
           <PressableRow
             onPress={onNext}
             disabled={nextDisabled}
-            accessibilityLabel={t(step === ONBOARDING_STEPS ? 'onboarding.done' : 'onboarding.next')}
-            style={{ flex: 2, backgroundColor: theme.color.accent, borderColor: theme.color.accent }}
+            accessibilityLabel={t(
+              step === ONBOARDING_STEPS ? 'onboarding.done' : 'onboarding.next',
+            )}
+            style={{
+              flex: 2,
+              backgroundColor: theme.color.accent,
+              borderColor: theme.color.accent,
+            }}
           >
             <Text variant="label" style={{ color: theme.color.card }}>
               {t(step === ONBOARDING_STEPS ? 'onboarding.done' : 'onboarding.next')}

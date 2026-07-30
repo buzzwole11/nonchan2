@@ -24,11 +24,30 @@ import { PressableRow } from '../../src/components/PressableRow';
 import { Text } from '../../src/components/Text';
 import { type MessageKey, translate } from '../../src/i18n';
 import { clearCache } from '../../src/offline/cache';
-import { useTheme } from '../../src/theme/ThemeProvider';
-import { useThemeControls } from '../../src/theme/ThemeProvider';
+import { useTheme, useThemeControls } from '../../src/theme/ThemeProvider';
 import type { ColorSchemePreference } from '../../src/theme/theme';
 
 const THEME_OPTIONS: ColorSchemePreference[] = ['system', 'light', 'dark'];
+
+/**
+ * Declared at module scope, not inside the screen.
+ *
+ * A component defined during render is a new type on every render, so React unmounts
+ * the whole subtree and mounts a fresh one — the settings chips below would lose focus
+ * mid-interaction, which for a screen reader user means being thrown back to the top of
+ * the section on every toggle.
+ */
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  const theme = useTheme();
+  return (
+    <View style={{ gap: theme.spacing.sm }}>
+      <Text variant="label" accessibilityRole="header">
+        {title}
+      </Text>
+      {children}
+    </View>
+  );
+}
 
 export default function ProfileScreen() {
   const theme = useTheme();
@@ -48,17 +67,6 @@ export default function ProfileScreen() {
       // The switch snaps back on the next render because the source of truth is the
       // server's copy of the settings, not local state.
     }
-  }
-
-  function Section({ titleKey, children }: { titleKey: MessageKey; children: React.ReactNode }) {
-    return (
-      <View style={{ gap: theme.spacing.sm }}>
-        <Text variant="label" accessibilityRole="header">
-          {t(titleKey)}
-        </Text>
-        {children}
-      </View>
-    );
   }
 
   return (
@@ -82,7 +90,7 @@ export default function ProfileScreen() {
         )}
       </View>
 
-      <Section titleKey="profile.reading">
+      <Section title={t('profile.reading')}>
         <Text variant="caption" tone="secondary">
           {t('onboarding.english.title')}
         </Text>
@@ -129,7 +137,7 @@ export default function ProfileScreen() {
         </View>
       </Section>
 
-      <Section titleKey="profile.display">
+      <Section title={t('profile.display')}>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
           {THEME_OPTIONS.map((option) => (
             <Chip
@@ -142,7 +150,9 @@ export default function ProfileScreen() {
           ))}
         </View>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+        >
           <Text>{t('status.reduceMotion')}</Text>
           <Switch
             value={user?.settings.reduceMotion ?? theme.reduceMotion}
@@ -151,7 +161,9 @@ export default function ProfileScreen() {
           />
         </View>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+        >
           {/* Spec section 20: haptics must be disableable. */}
           <Text>Haptics</Text>
           <Switch
@@ -166,7 +178,7 @@ export default function ProfileScreen() {
         </Text>
       </Section>
 
-      <Section titleKey="profile.data">
+      <Section title={t('profile.data')}>
         <PressableRow
           onPress={() => {
             void clearCache().then(() => setCacheCleared(true));

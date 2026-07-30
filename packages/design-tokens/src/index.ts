@@ -98,7 +98,8 @@ export function scaledType(
 ): { fontSize: number; lineHeight: number; fontFamily: string; fontWeight: string } {
   const spec = tokensJson.typography.scale[role];
   const scale = clampFontScale(osFontScale);
-  const family = tokensJson.typography.families[spec.family as keyof typeof tokensJson.typography.families];
+  const family =
+    tokensJson.typography.families[spec.family as keyof typeof tokensJson.typography.families];
   return {
     fontSize: Math.round(spec.fontSize * scale),
     lineHeight: Math.round(spec.lineHeight * scale),

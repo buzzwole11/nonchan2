@@ -11,7 +11,7 @@ function jsonResponse(status: number, body: unknown): Response {
 
 describe('ApiClient', () => {
   it('sends the bearer token when one is available', async () => {
-    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const calls: { url: string; init: RequestInit }[] = [];
     const client = new ApiClient({
       baseUrl: 'http://api.test',
       getToken: () => 'token-123',
@@ -155,12 +155,18 @@ describe('ApiClient', () => {
     });
 
     const result = await client.recordImpressions({
-      impressions: [{ paperId: 'a', position: 0 }, { paperId: 'b', position: 1, dwellMs: 4200 }],
+      impressions: [
+        { paperId: 'a', position: 0 },
+        { paperId: 'b', position: 1, dwellMs: 4200 },
+      ],
     });
 
     expect(result.recorded).toBe(2);
     expect(body).toEqual({
-      impressions: [{ paperId: 'a', position: 0 }, { paperId: 'b', position: 1, dwellMs: 4200 }],
+      impressions: [
+        { paperId: 'a', position: 0 },
+        { paperId: 'b', position: 1, dwellMs: 4200 },
+      ],
     });
   });
 

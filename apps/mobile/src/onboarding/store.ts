@@ -72,8 +72,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   setExploration: (exploration) => set({ exploration }),
   reset: () => set(DEFAULTS),
 
-  toInterests: () =>
-    get().fieldIds.map((fieldId, index) => ({ fieldId, ...strengthFor(index) })),
+  toInterests: () => get().fieldIds.map((fieldId, index) => ({ fieldId, ...strengthFor(index) })),
 }));
 
 export { strengthFor };

@@ -29,9 +29,7 @@ function channelLuminance(value8bit: number): number {
 
 export function relativeLuminance(hex: string): number {
   const { r, g, b } = parseHex(hex);
-  return (
-    0.2126 * channelLuminance(r) + 0.7152 * channelLuminance(g) + 0.0722 * channelLuminance(b)
-  );
+  return 0.2126 * channelLuminance(r) + 0.7152 * channelLuminance(g) + 0.0722 * channelLuminance(b);
 }
 
 /** Contrast ratio in the range [1, 21]. */

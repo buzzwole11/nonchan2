@@ -4,7 +4,7 @@
 
 完全な企画・技術仕様は [`PaperMatch_SPEC.md`](./PaperMatch_SPEC.md) にあります。この README は、いま何が動くのか、どう動かすのかだけを書いています。
 
-**現在の状態: Phase 0 完了 / Phase 1 は 1-B・1-C 完了（1-A 未着手）/ Phase 2 は AI 非依存部分が完了。** 実装フェーズの全体像は [`TASKS.md`](./TASKS.md)、設計上の判断とその理由は [`DECISIONS.md`](./DECISIONS.md)、構成の説明は [`ARCHITECTURE.md`](./ARCHITECTURE.md) を参照してください。
+**現在の状態: Phase 0 完了 / Phase 1 は 1-A〜1-D 完了（実 API への疎通と E2E は残）/ Phase 2 は AI 非依存部分が完了。** 実装フェーズの全体像は [`TASKS.md`](./TASKS.md)、設計上の判断とその理由は [`DECISIONS.md`](./DECISIONS.md)、構成の説明は [`ARCHITECTURE.md`](./ARCHITECTURE.md) を参照してください。
 
 ---
 
@@ -53,6 +53,20 @@ PAPERMATCH_OPENALEX_MAILTO=you@example.org     # 任意。OpenAlex の polite po
 ```bash
 cd apps/api && PAPERMATCH_LIVE_PROVIDERS=1 ./.venv/bin/pytest -m live -v
 ```
+
+## Lint と整形
+
+| 言語 | lint | 整形 |
+| --- | --- | --- |
+| Python | ruff + mypy | ruff format |
+| TypeScript | ESLint 9（flat config） | Prettier 3 |
+
+TypeScript 側にはプロジェクト固有のルールが 2 つあります（[`DECISIONS.md`](./DECISIONS.md) D-026）。
+
+- **スタイル中の 16 進カラーリテラルを禁止** — 配色は `@papermatch/design-tokens` の 1 箇所に置くと仕様書 19 節が決めており、20 節の色覚に依存しない対比はそれが単一の出所であることに依存しています。
+- **画面どうしの相互 import を禁止** — 画面はエントリポイントで、再利用単位ではありません。共有したいものは `src/` に出します。
+
+Markdown と手で整えた JSON は Prettier の対象外です（`.prettierignore` に理由を書いています）。
 
 ### まだ無いもの
 
@@ -113,12 +127,13 @@ make test        # すべて
 make test-api    # Python（統合テストは DB が必要）
 make test-unit   # DB 不要のものだけ
 make test-ts     # TypeScript
-make lint        # ruff + mypy + tsc
+make lint        # ruff + mypy + eslint + prettier + tsc
+make format      # 両言語の自動整形
 ```
 
 DB が無い環境では統合テストと E2E テストは失敗ではなく **skip** され、起動方法が理由に表示されます。
 
-現在: Python 249 件 / TypeScript 86 件。
+現在: Python 331 件 / TypeScript 89 件。
 
 | 種別 | 対象 |
 | --- | --- |

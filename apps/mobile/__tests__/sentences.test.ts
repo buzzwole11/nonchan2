@@ -2,6 +2,7 @@ import {
   isSelected,
   normalizeRange,
   rangeToSelection,
+  selectionFor,
   splitSentences,
   toggleSentence,
 } from '../src/reading/sentences';
@@ -11,11 +12,7 @@ describe('splitSentences', () => {
     const abstract = 'First sentence. Second one? Third!';
     const sentences = splitSentences(abstract);
 
-    expect(sentences.map((s) => s.text)).toEqual([
-      'First sentence.',
-      'Second one?',
-      'Third!',
-    ]);
+    expect(sentences.map((s) => s.text)).toEqual(['First sentence.', 'Second one?', 'Third!']);
     for (const sentence of sentences) {
       expect(abstract.slice(sentence.start, sentence.end)).toBe(sentence.text);
     }
@@ -118,5 +115,26 @@ describe('toggleSentence', () => {
     expect(isSelected({ from: 1, to: 3 }, 2)).toBe(true);
     expect(isSelected({ from: 1, to: 3 }, 4)).toBe(false);
     expect(isSelected(null, 0)).toBe(false);
+  });
+});
+
+describe('selectionFor', () => {
+  it('returns the selection made on the card being shown', () => {
+    expect(selectionFor({ paperId: 'p1', range: { from: 1, to: 2 } }, 'p1')).toEqual({
+      from: 1,
+      to: 2,
+    });
+  });
+
+  it('does not carry a selection over to the next card', () => {
+    // The bug this guards: sentence indices only mean something against the abstract they
+    // were taken from. Applied to the next paper they resolve to different character
+    // offsets, and the reader gets a translation of text they never selected.
+    expect(selectionFor({ paperId: 'p1', range: { from: 1, to: 2 } }, 'p2')).toBeNull();
+  });
+
+  it('has nothing to show when the deck is empty', () => {
+    expect(selectionFor({ paperId: 'p1', range: { from: 0, to: 0 } }, null)).toBeNull();
+    expect(selectionFor(null, 'p1')).toBeNull();
   });
 });

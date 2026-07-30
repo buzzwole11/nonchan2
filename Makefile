@@ -65,8 +65,12 @@ test-ts: ## Run the TypeScript tests
 .PHONY: lint
 lint: ## Lint and typecheck everything
 	cd $(API) && $(UV) run ruff check . && $(UV) run ruff format --check . && $(UV) run mypy papermatch_api
+	npm run lint
+	npm run format:check
 	npm run typecheck
 
 .PHONY: format
-format: ## Autoformat the Python code
+format: ## Autoformat both languages
 	cd $(API) && $(UV) run ruff format . && $(UV) run ruff check . --fix
+	npm run format
+	npm run lint:fix

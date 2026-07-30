@@ -18,7 +18,13 @@ export interface ChipProps {
  * spec section 20 forbids colour being the only carrier of meaning — and a selected chip
  * that only changes hue is invisible in greyscale and to a colour-blind reader.
  */
-export function Chip({ label, selected = false, onPress, accessibilityLabel, tone = 'neutral' }: ChipProps) {
+export function Chip({
+  label,
+  selected = false,
+  onPress,
+  accessibilityLabel,
+  tone = 'neutral',
+}: ChipProps) {
   const theme = useTheme();
   const accent =
     tone === 'accent'
@@ -44,7 +50,10 @@ export function Chip({ label, selected = false, onPress, accessibilityLabel, ton
         },
       ]}
     >
-      <Text variant="caption" tone={selected ? (tone === 'neutral' ? 'primary' : tone) : 'secondary'}>
+      <Text
+        variant="caption"
+        tone={selected ? (tone === 'neutral' ? 'primary' : tone) : 'secondary'}
+      >
         {selected ? `✓ ${label}` : label}
       </Text>
     </View>

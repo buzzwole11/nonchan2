@@ -59,6 +59,7 @@ export default function SavedScreen() {
   );
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on mount; see DECISIONS.md D-026
     void load(sort);
   }, [load, sort]);
 

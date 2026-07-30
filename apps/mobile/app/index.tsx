@@ -20,7 +20,14 @@ export default function Entry() {
 
   if (status === 'loading') {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.color.background }}>
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: theme.color.background,
+        }}
+      >
         <ActivityIndicator
           accessibilityLabel={translate('ja', 'common.loading')}
           color={theme.color.accent}

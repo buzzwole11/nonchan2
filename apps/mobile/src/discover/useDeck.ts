@@ -40,8 +40,17 @@ export interface DeckController {
 export function useDeck(): DeckController {
   const { api } = useSession();
   const [state, dispatch] = useReducer(deckReducer, initialDeckState);
+  // The async callbacks below (the impression flush timer, `act`, `undo`) all run after
+  // a commit and need the *latest* deck state, not the state captured when the callback
+  // was created. The ref is updated in an effect rather than during render: a render can
+  // be thrown away, and a ref written by a discarded render would leave these callbacks
+  // acting on a deck the user never saw.
+  //
+  // Declared before the effects that read it, so it is already current when they run.
   const stateRef = useRef(state);
-  stateRef.current = state;
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   const loadPage = useCallback(
     async (cursor: string | null, { allowCache }: { allowCache: boolean }) => {

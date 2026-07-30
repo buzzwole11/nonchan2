@@ -503,12 +503,6 @@ const PARENT_OF = {
   'cs.LG': 'cs', 'cs.DS': 'cs', 'cs.CL': 'cs', 'cs.CR': 'cs',
 };
 
-const ARXIV_PRIMARY = {
-  'hep-th': 'hep-th', 'cond-mat': 'cond-mat.str-el', 'quant-ph': 'quant-ph', 'astro-ph': 'astro-ph.CO',
-  'math.AP': 'math.AP', 'math.CO': 'math.CO', 'math.NT': 'math.NT', 'math.PR': 'math.PR',
-  'cs.LG': 'cs.LG', 'cs.DS': 'cs.DS', 'cs.CL': 'cs.CL', 'cs.CR': 'cs.CR',
-};
-
 const DOI_PREFIX = {
   physics: '10.1103', math: '10.4171', cs: '10.1145',
 };

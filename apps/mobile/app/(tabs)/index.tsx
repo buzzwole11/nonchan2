@@ -23,8 +23,9 @@ import { useDeck } from '../../src/discover/useDeck';
 import { type MessageKey, translate } from '../../src/i18n';
 import { TranslationSheet } from '../../src/reading/TranslationSheet';
 import {
-  type SelectionRange,
+  type ScopedSelection,
   rangeToSelection,
+  selectionFor,
   splitSentences,
   toggleSentence,
 } from '../../src/reading/sentences';
@@ -35,9 +36,17 @@ export default function DiscoverScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useSession();
   const deck = useDeck();
-  const [selection, setSelection] = useState<SelectionRange | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const shownAtRef = useRef<number>(Date.now());
+
+  // The selection belongs to the paper it was made on, so it carries that paper's id and
+  // is derived away when the card changes. Clearing it in an effect instead — which is
+  // what this used to do — leaves a one-render window where `selectionOffsets` maps
+  // sentence indices from the previous abstract onto this one, and the translation
+  // request that comes out of it is for text the reader never selected.
+  const [selectionState, setSelectionState] = useState<ScopedSelection | null>(null);
+
+  // Set by the effect below, on the render where the card actually reaches the screen.
+  const shownAtRef = useRef<number>(0);
 
   const locale: 'ja' | 'en' = (user?.settings.locale ?? 'ja').startsWith('en') ? 'en' : 'ja';
   const t = (key: MessageKey, params?: Record<string, string | number>) =>
@@ -45,11 +54,12 @@ export default function DiscoverScreen() {
 
   const current = deck.current;
 
+  const selection = selectionFor(selectionState, current?.paper.id ?? null);
+
   // A card counts as shown once it is actually on screen, not when it was fetched.
   useEffect(() => {
     if (current === null) return;
     shownAtRef.current = Date.now();
-    setSelection(null);
     deck.noteImpression(current.paper.id, current.position);
   }, [current, deck]);
 
@@ -96,8 +106,9 @@ export default function DiscoverScreen() {
   }, [current, selection]);
 
   function onSelectSentence(index: number) {
+    if (current === null) return;
     const next = toggleSentence(selection, index);
-    setSelection(next);
+    setSelectionState(next === null ? null : { paperId: current.paper.id, range: next });
     setSheetOpen(next !== null);
   }
 
@@ -155,7 +166,10 @@ export default function DiscoverScreen() {
           />
         ) : deck.state.loading ? (
           <View style={styles.centre}>
-            <ActivityIndicator accessibilityLabel={t('common.loading')} color={theme.color.accent} />
+            <ActivityIndicator
+              accessibilityLabel={t('common.loading')}
+              color={theme.color.accent}
+            />
           </View>
         ) : deck.state.error !== null ? (
           <View style={[styles.centre, { gap: theme.spacing.md }]}>
@@ -206,7 +220,7 @@ export default function DiscoverScreen() {
           initialStage={user?.settings.initialTranslationStage ?? 'natural'}
           onClose={() => {
             setSheetOpen(false);
-            setSelection(null);
+            setSelectionState(null);
           }}
         />
       )}

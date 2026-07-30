@@ -83,9 +83,9 @@ test('font scale is clamped into the designed Dynamic Type range', () => {
 });
 
 test('scaled type keeps line height above font size at maximum Dynamic Type', () => {
-  for (const role of Object.keys(tokens.typography.scale) as Array<
-    keyof typeof tokens.typography.scale
-  >) {
+  for (const role of Object.keys(
+    tokens.typography.scale,
+  ) as (keyof typeof tokens.typography.scale)[]) {
     const scaled = scaledType(role, tokens.typography.dynamicType.maxScale);
     assert.ok(
       scaled.lineHeight > scaled.fontSize,

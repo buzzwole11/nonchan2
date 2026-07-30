@@ -179,3 +179,27 @@ export function isSelected(range: SelectionRange | null, index: number): boolean
   const { from, to } = normalizeRange(range);
   return index >= from && index <= to;
 }
+
+/** A selection together with the paper it was made on. */
+export interface ScopedSelection {
+  paperId: string;
+  range: SelectionRange;
+}
+
+/**
+ * The selection that applies to `paperId`, or null if it belongs to another paper.
+ *
+ * Sentence indices only mean something against the abstract they were taken from, and
+ * `rangeToSelection` turns them into character offsets without knowing which paper they
+ * came from. Scoping the selection to its paper — rather than clearing it in an effect
+ * after the card changes — removes the render in between, where indices from the previous
+ * abstract would be resolved against this one and a translation requested for text the
+ * reader never selected.
+ */
+export function selectionFor(
+  scoped: ScopedSelection | null,
+  paperId: string | null,
+): SelectionRange | null {
+  if (scoped === null || paperId === null) return null;
+  return scoped.paperId === paperId ? scoped.range : null;
+}

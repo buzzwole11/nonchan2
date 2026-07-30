@@ -132,7 +132,11 @@ export class ApiClient {
     }
 
     if (!response.ok) {
-      const error = (payload as { error?: { code?: string; message?: string; details?: Record<string, string[]> } })?.error;
+      const error = (
+        payload as {
+          error?: { code?: string; message?: string; details?: Record<string, string[]> };
+        }
+      )?.error;
       throw new ApiError(
         response.status,
         error?.code ?? `http_${response.status}`,
@@ -257,7 +261,9 @@ export class ApiClient {
     return this.request<ExpressionResponse>('/expressions', { method: 'POST', body });
   }
 
-  expressions(params: { kind?: string; limit?: number; cursor?: string } = {}): Promise<ExpressionListResponse> {
+  expressions(
+    params: { kind?: string; limit?: number; cursor?: string } = {},
+  ): Promise<ExpressionListResponse> {
     return this.request<ExpressionListResponse>('/expressions', {
       query: { kind: params.kind, limit: params.limit, cursor: params.cursor },
     });

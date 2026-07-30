@@ -14,6 +14,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
@@ -67,20 +68,30 @@ export interface SessionProviderProps {
 }
 
 export function SessionProvider({ children, client }: SessionProviderProps) {
-  const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [status, setStatus] = useState<SessionStatus>('loading');
   const [attempt, setAttempt] = useState(0);
 
+  // The client reads the token through a ref so a refreshed token takes effect without
+  // rebuilding the client (and invalidating every react-query cache keyed on it).
+  //
+  // A ref, not a memoised object: this value is mutated, and mutating something React
+  // memoised is how you get a value that silently reverts when React decides to discard
+  // the memo.
+  //
+  // The ref is the only copy. It used to be mirrored into state as well, but nothing
+  // rendered from that copy — the UI keys off `status` and `user` — so all it did was
+  // re-render the whole tree on every token change.
+  const tokenRef = useRef<string | null>(null);
+
   const api = useMemo(
+    // The ref is read inside `getToken`, which the client calls when it builds a request
+    // — never during render. The rule flags the closure because it is *constructed* here
+    // and cannot see when it is invoked.
+    // eslint-disable-next-line react-hooks/refs -- read at request time, not render time
     () => client ?? new ApiClient({ baseUrl: apiBaseUrl(), getToken: () => tokenRef.current }),
     [client],
   );
-
-  // The client reads the token through a ref so a refreshed token takes effect without
-  // rebuilding the client (and invalidating every react-query cache keyed on it).
-  const tokenRef = useMemo(() => ({ current: null as string | null }), []);
-  tokenRef.current = token;
 
   useEffect(() => {
     let cancelled = false;
@@ -94,7 +105,6 @@ export function SessionProvider({ children, client }: SessionProviderProps) {
         try {
           const existing = await api.me();
           if (cancelled) return;
-          setToken(stored);
           setUser(existing);
           setStatus('ready');
           return;
@@ -104,7 +114,6 @@ export function SessionProvider({ children, client }: SessionProviderProps) {
             // usable and re-verifying on every launch would make the app unusable on a
             // train (spec section 25).
             if (cancelled) return;
-            setToken(stored);
             setStatus('offline');
             return;
           }
@@ -121,7 +130,6 @@ export function SessionProvider({ children, client }: SessionProviderProps) {
         if (cancelled) return;
         await writeToken(created.accessToken);
         tokenRef.current = created.accessToken;
-        setToken(created.accessToken);
         setUser(created.user);
         setStatus('ready');
       } catch {
@@ -133,7 +141,7 @@ export function SessionProvider({ children, client }: SessionProviderProps) {
     return () => {
       cancelled = true;
     };
-  }, [api, attempt, tokenRef]);
+  }, [api, attempt]);
 
   const refreshUser = useCallback(async () => {
     try {
@@ -146,10 +154,9 @@ export function SessionProvider({ children, client }: SessionProviderProps) {
   const signOut = useCallback(async () => {
     await writeToken(null);
     tokenRef.current = null;
-    setToken(null);
     setUser(null);
     setAttempt((n) => n + 1);
-  }, [tokenRef]);
+  }, []);
 
   const value = useMemo(
     () => ({

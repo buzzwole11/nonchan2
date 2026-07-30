@@ -13,9 +13,22 @@ import enums from '../enums.json' with { type: 'json' };
 export const vocabularies = enums;
 
 /** Section 16: canonical-id precedence, highest first. */
-export const IDENTIFIER_KINDS = ['doi', 'arxiv', 'semantic_scholar', 'openalex', 'title_author_year'] as const;
+export const IDENTIFIER_KINDS = [
+  'doi',
+  'arxiv',
+  'semantic_scholar',
+  'openalex',
+  'title_author_year',
+] as const;
 
-export const SOURCE_PROVIDERS = ['arxiv', 'openalex', 'semantic_scholar', 'crossref', 'mock', 'manual'] as const;
+export const SOURCE_PROVIDERS = [
+  'arxiv',
+  'openalex',
+  'semantic_scholar',
+  'crossref',
+  'mock',
+  'manual',
+] as const;
 
 export const PAPER_TYPES = [
   'original',
@@ -28,9 +41,22 @@ export const PAPER_TYPES = [
   'recent',
 ] as const;
 
-export const OPEN_ACCESS_STATUSES = ['gold', 'green', 'hybrid', 'bronze', 'closed', 'unknown'] as const;
+export const OPEN_ACCESS_STATUSES = [
+  'gold',
+  'green',
+  'hybrid',
+  'bronze',
+  'closed',
+  'unknown',
+] as const;
 
-export const RETRACTION_STATUSES = ['none', 'corrected', 'concern_expressed', 'withdrawn', 'retracted'] as const;
+export const RETRACTION_STATUSES = [
+  'none',
+  'corrected',
+  'concern_expressed',
+  'withdrawn',
+  'retracted',
+] as const;
 
 export const ENGLISH_LEVELS = ['beginner', 'intermediate', 'advanced', 'native_like'] as const;
 
@@ -40,7 +66,13 @@ export const EXPLORATION_LEVELS = ['focused', 'balanced', 'adventurous'] as cons
 
 export const INTEREST_MODES = ['main', 'occasional', 'serendipity'] as const;
 
-export const ABSTRACT_SECTIONS = ['background', 'problem', 'method', 'result', 'significance'] as const;
+export const ABSTRACT_SECTIONS = [
+  'background',
+  'problem',
+  'method',
+  'result',
+  'significance',
+] as const;
 
 /**
  * Section 8: how a structural label was produced. A rule-based pass is `heuristic`, not
@@ -92,7 +124,13 @@ export const FEED_REASONS = [
   'recent',
 ] as const;
 
-export const TRANSLATION_STYLES = ['natural', 'faithful', 'literal', 'academic', 'plain_japanese'] as const;
+export const TRANSLATION_STYLES = [
+  'natural',
+  'faithful',
+  'literal',
+  'academic',
+  'plain_japanese',
+] as const;
 
 export const TRANSLATION_STAGES = [
   'hard_words',
@@ -136,7 +174,13 @@ export const CANVAS_STYLES = ['mosaic', 'constellation', 'landscape', 'spectrum'
 
 export const METRIC_SIGNATURES = ['as_published', 'mostly_minus', 'mostly_plus'] as const;
 
-export const UNIT_SYSTEMS = ['si', 'gaussian', 'heaviside_lorentz', 'natural', 'geometric'] as const;
+export const UNIT_SYSTEMS = [
+  'si',
+  'gaussian',
+  'heaviside_lorentz',
+  'natural',
+  'geometric',
+] as const;
 
 export type IdentifierKind = (typeof IDENTIFIER_KINDS)[number];
 export type SourceProvider = (typeof SOURCE_PROVIDERS)[number];

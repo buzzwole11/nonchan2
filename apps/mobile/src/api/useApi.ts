@@ -23,8 +23,5 @@ export function setAuthToken(token: string | null): void {
 }
 
 export function useApiClient(): ApiClient {
-  return useMemo(
-    () => new ApiClient({ baseUrl: apiBaseUrl(), getToken: () => inMemoryToken }),
-    [],
-  );
+  return useMemo(() => new ApiClient({ baseUrl: apiBaseUrl(), getToken: () => inMemoryToken }), []);
 }

@@ -70,14 +70,41 @@ function errorMessageKey(error: unknown): MessageKey {
   return 'translate.failed';
 }
 
-export function TranslationSheet({
-  visible,
+/**
+ * The sheet shell. Everything with state lives in the body below, which is mounted only
+ * while the sheet is open.
+ *
+ * The body used to stay mounted and reset itself in an effect when `visible` went false.
+ * Unmounting is the same reset without the window: a sheet reopened on a new selection
+ * cannot show the previous selection's translation for a frame while the new request is
+ * still in flight.
+ */
+export function TranslationSheet({ visible, onClose, ...rest }: TranslationSheetProps) {
+  const theme = useTheme();
+  return (
+    <Modal
+      visible={visible}
+      animationType={theme.reduceMotion ? 'fade' : 'slide'}
+      transparent
+      onRequestClose={onClose}
+      // Spec section 20: the sheet traps focus so a screen reader does not wander back
+      // into the card behind it.
+      accessibilityViewIsModal
+    >
+      {visible ? <TranslationSheetBody onClose={onClose} {...rest} /> : null}
+    </Modal>
+  );
+}
+
+type TranslationSheetBodyProps = Omit<TranslationSheetProps, 'visible'>;
+
+function TranslationSheetBody({
   locale,
   paperId,
   selection,
   initialStage,
   onClose,
-}: TranslationSheetProps) {
+}: TranslationSheetBodyProps) {
   const theme = useTheme();
   const { api } = useSession();
   const [stage, setStage] = useState<TranslationStage>(initialStage);
@@ -114,15 +141,11 @@ export function TranslationSheet({
     [api, paperId, selection, locale], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
+  // Runs once per opening, because this component only exists while the sheet is open.
   useEffect(() => {
-    if (!visible) {
-      setState({ kind: 'idle' });
-      setSaveState({ kind: 'idle' });
-      setStage(initialStage);
-      return;
-    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on mount; see DECISIONS.md D-026
     void run(initialStage);
-  }, [visible, initialStage, run]);
+  }, [initialStage, run]);
 
   function chooseStage(next: TranslationStage) {
     setStage(next);
@@ -156,122 +179,115 @@ export function TranslationSheet({
   }
 
   return (
-    <Modal
-      visible={visible}
-      animationType={theme.reduceMotion ? 'fade' : 'slide'}
-      transparent
-      onRequestClose={onClose}
-      // Spec section 20: the sheet traps focus so a screen reader does not wander back
-      // into the card behind it.
-      accessibilityViewIsModal
-    >
-      <View style={[styles.backdrop, { backgroundColor: theme.color.overlay }]}>
-        <View
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: theme.color.card,
-              borderTopLeftRadius: theme.radius.sheet,
-              borderTopRightRadius: theme.radius.sheet,
-              padding: theme.spacing.cardPadding,
-              gap: theme.spacing.md,
-            },
-          ]}
-        >
-          <View style={styles.header}>
-            <Text variant="label" accessibilityRole="header">
-              {t('translate.title')}
-            </Text>
-            <PressableRow
-              onPress={onClose}
-              accessibilityLabel={t('translate.cancel')}
-              style={{ borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 0 }}
-            >
-              <Text variant="label" tone="accent">
-                {t('translate.cancel')}
-              </Text>
-            </PressableRow>
-          </View>
-
-          {/* The original stays visible above everything else. */}
-          <View
-            style={{
-              backgroundColor: theme.color.background,
-              borderRadius: theme.radius.tile,
-              padding: theme.spacing.md,
-            }}
-          >
-            <Text variant="caption" tone="secondary">
-              {t('translate.original')}
-            </Text>
-            <Text variant="abstract">{selection?.exactText ?? ''}</Text>
-          </View>
-
-          <Text variant="caption" tone="secondary">
-            {t('translate.stage')}
+    <View style={[styles.backdrop, { backgroundColor: theme.color.overlay }]}>
+      <View
+        style={[
+          styles.sheet,
+          {
+            backgroundColor: theme.color.card,
+            borderTopLeftRadius: theme.radius.sheet,
+            borderTopRightRadius: theme.radius.sheet,
+            padding: theme.spacing.cardPadding,
+            gap: theme.spacing.md,
+          },
+        ]}
+      >
+        <View style={styles.header}>
+          <Text variant="label" accessibilityRole="header">
+            {t('translate.title')}
           </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
-              {STAGES.map((option) => (
-                <Chip
-                  key={option}
-                  label={t(`stage.${option}` as MessageKey)}
-                  selected={option === stage}
-                  tone="accent"
-                  onPress={() => chooseStage(option)}
-                />
-              ))}
-            </View>
-          </ScrollView>
+          <PressableRow
+            onPress={onClose}
+            accessibilityLabel={t('translate.cancel')}
+            style={{ borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 0 }}
+          >
+            <Text variant="label" tone="accent">
+              {t('translate.cancel')}
+            </Text>
+          </PressableRow>
+        </View>
 
-          <ScrollView style={{ maxHeight: 220 }}>
-            {state.kind === 'loading' && (
-              <ActivityIndicator accessibilityLabel={t('translate.loading')} color={theme.color.accent} />
-            )}
+        {/* The original stays visible above everything else. */}
+        <View
+          style={{
+            backgroundColor: theme.color.background,
+            borderRadius: theme.radius.tile,
+            padding: theme.spacing.md,
+          }}
+        >
+          <Text variant="caption" tone="secondary">
+            {t('translate.original')}
+          </Text>
+          <Text variant="abstract">{selection?.exactText ?? ''}</Text>
+        </View>
 
-            {state.kind === 'error' && (
-              <View style={{ gap: theme.spacing.sm }}>
-                <Text tone="warning">{t(state.messageKey)}</Text>
-                <PressableRow onPress={() => void run(stage)} accessibilityLabel={t('common.retry')}>
-                  <Text tone="accent">{t('common.retry')}</Text>
-                </PressableRow>
-              </View>
-            )}
-
-            {state.kind === 'ready' && (
-              <View style={{ gap: theme.spacing.sm }}>
-                {state.fellBack && <Text tone="warning">{t('translate.fellBack')}</Text>}
-                <Text variant="abstract">{state.translated}</Text>
-                {state.notice !== null && (
-                  <Text variant="caption" tone="secondary">
-                    {state.notice}
-                  </Text>
-                )}
-              </View>
-            )}
-          </ScrollView>
-
-          <View style={{ gap: theme.spacing.xs }}>
-            <PressableRow
-              onPress={() => void saveExpression()}
-              disabled={selection === null || saveState.kind === 'saving'}
-              accessibilityLabel={t('translate.saveExpression')}
-            >
-              <Text tone="accent">{t('translate.saveExpression')}</Text>
-            </PressableRow>
-            {saveState.kind === 'done' && (
-              <Text
-                variant="caption"
-                tone={saveState.messageKey === 'translate.saveFailed' ? 'warning' : 'saved'}
-                accessibilityLiveRegion="polite"
-              >
-                {t(saveState.messageKey)}
-              </Text>
-            )}
+        <Text variant="caption" tone="secondary">
+          {t('translate.stage')}
+        </Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+            {STAGES.map((option) => (
+              <Chip
+                key={option}
+                label={t(`stage.${option}` as MessageKey)}
+                selected={option === stage}
+                tone="accent"
+                onPress={() => chooseStage(option)}
+              />
+            ))}
           </View>
+        </ScrollView>
+
+        <ScrollView style={{ maxHeight: 220 }}>
+          {state.kind === 'loading' && (
+            <ActivityIndicator
+              accessibilityLabel={t('translate.loading')}
+              color={theme.color.accent}
+            />
+          )}
+
+          {state.kind === 'error' && (
+            <View style={{ gap: theme.spacing.sm }}>
+              <Text tone="warning">{t(state.messageKey)}</Text>
+              <PressableRow onPress={() => void run(stage)} accessibilityLabel={t('common.retry')}>
+                <Text tone="accent">{t('common.retry')}</Text>
+              </PressableRow>
+            </View>
+          )}
+
+          {state.kind === 'ready' && (
+            <View style={{ gap: theme.spacing.sm }}>
+              {state.fellBack && <Text tone="warning">{t('translate.fellBack')}</Text>}
+              <Text variant="abstract">{state.translated}</Text>
+              {state.notice !== null && (
+                <Text variant="caption" tone="secondary">
+                  {state.notice}
+                </Text>
+              )}
+            </View>
+          )}
+        </ScrollView>
+
+        <View style={{ gap: theme.spacing.xs }}>
+          <PressableRow
+            onPress={() => void saveExpression()}
+            disabled={selection === null || saveState.kind === 'saving'}
+            accessibilityLabel={t('translate.saveExpression')}
+          >
+            <Text tone="accent">{t('translate.saveExpression')}</Text>
+          </PressableRow>
+          {saveState.kind === 'done' && (
+            <Text
+              variant="caption"
+              tone={saveState.messageKey === 'translate.saveFailed' ? 'warning' : 'saved'}
+              accessibilityLiveRegion="polite"
+            >
+              {t(saveState.messageKey)}
+            </Text>
+          )}
         </View>
       </View>
-    </Modal>
+    </View>
   );
 }
 

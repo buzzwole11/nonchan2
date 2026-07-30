@@ -41,7 +41,7 @@ export interface DeckState {
   exhausted: boolean;
   pendingUndo: PendingUndo | null;
   /** Impressions recorded but not yet accepted by the server. */
-  unsentImpressions: Array<{ paperId: string; position: number; dwellMs: number | null }>;
+  unsentImpressions: { paperId: string; position: number; dwellMs: number | null }[];
   error: 'offline' | 'failed' | null;
 }
 

@@ -71,6 +71,10 @@ export function AbstractCard({
           borderColor: theme.color.border,
           borderRadius: theme.radius.card,
           padding: theme.spacing.cardPadding,
+          // Themed, not a literal: a black shadow is invisible against the dark card
+          // surface, and the stack depth is the only cue that a second card is behind
+          // this one.
+          shadowColor: theme.color.shadow,
           shadowOpacity: behind ? 0 : theme.elevation.card.shadowOpacity,
           shadowRadius: theme.elevation.card.shadowRadius,
           shadowOffset: { width: 0, height: theme.elevation.card.shadowOffsetY },
@@ -110,7 +114,11 @@ export function AbstractCard({
 
       {/* -- why this card ------------------------------------------------------ */}
       <View style={{ marginTop: theme.spacing.md }}>
-        <Text variant="caption" tone="secondary" accessibilityLabel={`${t('discover.whyThis')}: ${item.reasonText}`}>
+        <Text
+          variant="caption"
+          tone="secondary"
+          accessibilityLabel={`${t('discover.whyThis')}: ${item.reasonText}`}
+        >
           {item.reasonText}
         </Text>
       </View>
@@ -137,48 +145,55 @@ export function AbstractCard({
         <Text variant="caption" tone="secondary" style={{ marginBottom: theme.spacing.sm }}>
           {t('discover.tapToTranslate')}
         </Text>
-        <View style={styles.sentences}>
+        {/*
+          Nested <Text>, not a row of Pressables.
+
+          Sentences have to flow into one paragraph and wrap at the card edge. Laid out as
+          separate flex children they each became one unwrappable line, and the abstract —
+          the body of the card in spec section 6 — was clipped after about forty
+          characters. Nested text is the only structure that gives per-sentence tap
+          targets *and* ordinary line breaking; each child keeps its own accessibility
+          role and label, so every sentence is still reachable individually.
+        */}
+        <Text variant="abstract">
           {sentences.map((sentence) => {
             const active = isSelected(selection, sentence.index);
             return (
-              <Pressable
+              <Text
                 key={sentence.index}
-                onPress={() => onSelectSentence(sentence.index)}
-                disabled={behind}
+                variant="abstract"
+                onPress={behind ? undefined : () => onSelectSentence(sentence.index)}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
                 accessibilityLabel={sentence.text}
                 accessibilityHint={t('discover.tapToTranslate')}
-                style={{
-                  backgroundColor: active ? theme.color.translationSurface : 'transparent',
-                  borderRadius: theme.radius.tile / 2,
-                }}
+                style={
+                  active
+                    ? {
+                        // Tint *and* underline: the selection has to survive greyscale
+                        // and colour-blindness (spec section 20).
+                        backgroundColor: theme.color.translationSurface,
+                        textDecorationLine: 'underline',
+                      }
+                    : undefined
+                }
               >
-                <Text
-                  variant="abstract"
-                  style={
-                    active
-                      ? {
-                          // Selected text gets an underline as well as a tint, so the
-                          // selection is visible without colour (spec section 20).
-                          textDecorationLine: 'underline',
-                        }
-                      : undefined
-                  }
-                >
-                  {sentence.text}{' '}
-                </Text>
-              </Pressable>
+                {sentence.text}{' '}
+              </Text>
             );
           })}
-        </View>
+        </Text>
       </ScrollView>
 
       {/* -- footer ------------------------------------------------------------- */}
       <View
         style={[
           styles.footer,
-          { borderTopColor: theme.color.border, paddingTop: theme.spacing.md, gap: theme.spacing.sm },
+          {
+            borderTopColor: theme.color.border,
+            paddingTop: theme.spacing.md,
+            gap: theme.spacing.sm,
+          },
         ]}
       >
         <Text variant="caption" tone="secondary">
@@ -192,7 +207,9 @@ export function AbstractCard({
           hitSlop={8}
         >
           <Text variant="caption" tone="accent">
-            {primaryIdentifier ? `${primaryIdentifier.kind}: ${primaryIdentifier.value}` : paper.sourceUrl}
+            {primaryIdentifier
+              ? `${primaryIdentifier.kind}: ${primaryIdentifier.value}`
+              : paper.sourceUrl}
           </Text>
         </Pressable>
         <Text variant="caption" tone="secondary">
@@ -207,13 +224,8 @@ const styles = StyleSheet.create({
   card: {
     flex: 1,
     borderWidth: StyleSheet.hairlineWidth,
-    shadowColor: '#000',
   },
   chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  sentences: {
     flexDirection: 'row',
     flexWrap: 'wrap',
   },

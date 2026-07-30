@@ -22,7 +22,8 @@ export interface UndoToastProps {
 export function UndoToast({ pending, locale, onUndo, onDismiss }: UndoToastProps) {
   const theme = useTheme();
   const t = (key: MessageKey) => translate(locale, key);
-  const message = pending.actionType === 'save' ? t('discover.savedToast') : t('discover.skippedToast');
+  const message =
+    pending.actionType === 'save' ? t('discover.savedToast') : t('discover.skippedToast');
   // Undo needs a server-side action to reverse; until the request lands there is nothing
   // to point at, so the control is disabled rather than silently doing nothing.
   const ready = pending.actionId !== null;

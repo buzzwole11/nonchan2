@@ -80,15 +80,19 @@
 - [x] オフラインキャッシュ（AsyncStorage、フィード 20 件 + 保存一覧）
 - [x] タブナビゲーション 4 面（Learn は Phase 2 と明示した空画面）
 - [x] トークンを `expo-secure-store` へ（web ではメモリにフォールバック）
-- [ ] **実機で文タップ選択を確認する** — web ビルドでは react-native-gesture-handler が
-      ポインタを横取りするため未確認（DECISIONS.md D-021）。タップハンドラ自体は
-      コンポーネントテストで担保済み。
+- [ ] **実機で文タップ選択を確認する** — web ブラウザでは選択・翻訳シートとも動作を確認済み
+      （DECISIONS.md D-021 の訂正）。ただしマウスのクリックはタッチのジェスチャーではなく、
+      Pan と tap が実際に競合するのはタッチ入力なので、実機確認は残しています。
 
 ### 1-D 品質
+- [x] **TypeScript の lint（ESLint 9 + Prettier 3）** — `make lint` と CI の必須チェック。
+      色リテラル禁止と画面間 import 禁止をプロジェクト固有ルールとして追加（DECISIONS.md D-026）
+- [x] トークンを `expo-secure-store` へ移す（DECISIONS.md D-007）
+- [ ] `saved` / `learn` / 翻訳シートのデータ取得を `@tanstack/react-query` へ移す —
+      `react-hooks/set-state-in-effect` の指摘 3 件はこれが本来の直し方（DECISIONS.md D-026）。
+      現状は行ごとの disable。オフライン時のキャッシュ・フォールバックを壊さないことが条件
 - [ ] Maestro による E2E（オンボーディング / スワイプ / Undo / 範囲選択翻訳 / オフライン / VoiceOver 操作）
 - [ ] Visual regression（light・dark / 小画面・大画面 / 日本語長文 / Dynamic Type / Reduce Motion）
-- [x] トークンを `expo-secure-store` へ移す（DECISIONS.md D-007）
-- [ ] TypeScript の lint（ESLint + Prettier）。Phase 0 では tsc のみで、スタイル統一は未整備
 
 ---
 
@@ -187,13 +191,13 @@ AI が要る項目は環境制約で未着手です（DECISIONS.md D-024）。
 
 | 項目 | 状況 |
 | --- | --- |
-| TypeScript の lint | tsc のみ。ESLint / Prettier は Phase 1-D で導入 |
+| データ取得の effect | `saved` / `learn` / 翻訳シートは react-query へ移すべき（DECISIONS.md D-026） |
 | 実データ Provider | 実装済み。実 API への疎通のみ未確認（`-m live`、DECISIONS.md D-016 / D-025） |
 | 取り込み worker | 未実装。Provider は繋がるが、定期取り込みと撤回・版更新の同期がまだない |
-| web での文タップ選択 | RNGH の web 実装がポインタを横取り。出荷対象外だが実機確認は必要 |
+| 文タップ選択の実機確認 | web ブラウザでは動作確認済み。タッチ入力での Pan/tap 競合は未確認（D-021 訂正） |
 | Discover の下スワイプ | 「Before you read」は Phase 2。現状は無反応 |
 | モバイルの E2E | Phase 1-D（Maestro）。Phase 0 の E2E は API レベル |
 | pgvector 列 | Phase 3（DECISIONS.md D-006） |
 | レート制限 | Provider 側は実装済み（`providers/http.py`）。API 側の呼び出し元制限は未実装 |
-| 観測性 | 構造化ログ・トレース・Provider レイテンシ指標は Phase 1-A |
+| 観測性 | 構造化ログ・トレース・Provider レイテンシ指標は未実装 |
 | AI 説明・実翻訳 | 環境がネットワークを遮断（DECISIONS.md D-024）。interface は Phase 0 から存在 |

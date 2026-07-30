@@ -214,7 +214,12 @@ describe('UndoToast', () => {
 
   it('names the paper it would restore', () => {
     withTheme(
-      <UndoToast pending={pending} locale="ja" onUndo={() => undefined} onDismiss={() => undefined} />,
+      <UndoToast
+        pending={pending}
+        locale="ja"
+        onUndo={() => undefined}
+        onDismiss={() => undefined}
+      />,
     );
     expect(screen.getByText('Anomalous Transport in Kagome Metals')).toBeTruthy();
   });

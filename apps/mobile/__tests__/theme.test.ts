@@ -23,7 +23,12 @@ describe('colour scheme resolution', () => {
 });
 
 describe('theme', () => {
-  const base = { preference: 'system', systemScheme: 'light', reduceMotion: false, fontScale: 1 } as const;
+  const base = {
+    preference: 'system',
+    systemScheme: 'light',
+    reduceMotion: false,
+    fontScale: 1,
+  } as const;
 
   it('exposes the token palette for the resolved scheme', () => {
     expect(buildTheme(base).color.background).toBe(tokens.color.light.background);

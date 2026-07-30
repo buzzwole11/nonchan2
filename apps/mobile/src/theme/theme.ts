@@ -13,7 +13,7 @@ import {
   duration,
   getTheme,
   scaledType,
-  tokens,
+  type tokens,
 } from '@papermatch/design-tokens';
 
 export type ColorSchemePreference = 'system' | 'light' | 'dark';
