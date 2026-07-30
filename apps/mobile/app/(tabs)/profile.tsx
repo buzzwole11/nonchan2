@@ -1,0 +1,186 @@
+/**
+ * Profile: reading preferences, display and data (spec sections 18, 20, 25).
+ *
+ * Everything onboarding asked for is changeable here — a setup screen the user cannot
+ * revisit is a trap — plus the accessibility switches from section 20 and the data
+ * controls from section 25.
+ */
+import { useState } from 'react';
+import { ScrollView, Switch, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import {
+  ENGLISH_LEVELS,
+  EXPLORATION_LEVELS,
+  MATH_LEVELS,
+  type EnglishLevel,
+  type ExplorationLevel,
+  type MathLevel,
+} from '@papermatch/shared-types';
+
+import { useSession } from '../../src/api/session';
+import { Chip } from '../../src/components/Chip';
+import { PressableRow } from '../../src/components/PressableRow';
+import { Text } from '../../src/components/Text';
+import { type MessageKey, translate } from '../../src/i18n';
+import { clearCache } from '../../src/offline/cache';
+import { useTheme } from '../../src/theme/ThemeProvider';
+import { useThemeControls } from '../../src/theme/ThemeProvider';
+import type { ColorSchemePreference } from '../../src/theme/theme';
+
+const THEME_OPTIONS: ColorSchemePreference[] = ['system', 'light', 'dark'];
+
+export default function ProfileScreen() {
+  const theme = useTheme();
+  const { preference, setPreference } = useThemeControls();
+  const insets = useSafeAreaInsets();
+  const { api, user, refreshUser } = useSession();
+  const [cacheCleared, setCacheCleared] = useState(false);
+
+  const locale: 'ja' | 'en' = (user?.settings.locale ?? 'ja').startsWith('en') ? 'en' : 'ja';
+  const t = (key: MessageKey) => translate(locale, key);
+
+  async function patch(settings: Parameters<typeof api.updateSettings>[0]): Promise<void> {
+    try {
+      await api.updateSettings(settings);
+      await refreshUser();
+    } catch {
+      // The switch snaps back on the next render because the source of truth is the
+      // server's copy of the settings, not local state.
+    }
+  }
+
+  function Section({ titleKey, children }: { titleKey: MessageKey; children: React.ReactNode }) {
+    return (
+      <View style={{ gap: theme.spacing.sm }}>
+        <Text variant="label" accessibilityRole="header">
+          {t(titleKey)}
+        </Text>
+        {children}
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView
+      style={{ backgroundColor: theme.color.background }}
+      contentContainerStyle={{
+        paddingTop: insets.top + theme.spacing.xl,
+        paddingHorizontal: theme.spacing.screenHorizontal,
+        paddingBottom: insets.bottom + theme.spacing.xxl,
+        gap: theme.spacing.xl,
+      }}
+    >
+      <View style={{ gap: theme.spacing.xs }}>
+        <Text variant="title" accessibilityRole="header">
+          {t('profile.title')}
+        </Text>
+        {user?.isGuest === true && (
+          <Text variant="caption" tone="secondary">
+            {t('profile.guest')}
+          </Text>
+        )}
+      </View>
+
+      <Section titleKey="profile.reading">
+        <Text variant="caption" tone="secondary">
+          {t('onboarding.english.title')}
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+          {ENGLISH_LEVELS.map((level) => (
+            <Chip
+              key={level}
+              label={t(`english.${level}` as MessageKey)}
+              selected={user?.settings.englishLevel === level}
+              tone="accent"
+              onPress={() => void patch({ englishLevel: level as EnglishLevel })}
+            />
+          ))}
+        </View>
+
+        <Text variant="caption" tone="secondary">
+          {t('onboarding.math.title')}
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+          {MATH_LEVELS.map((level) => (
+            <Chip
+              key={level}
+              label={t(`math.${level}` as MessageKey)}
+              selected={user?.settings.mathLevel === level}
+              tone="accent"
+              onPress={() => void patch({ mathLevel: level as MathLevel })}
+            />
+          ))}
+        </View>
+
+        <Text variant="caption" tone="secondary">
+          {t('onboarding.exploration.title')}
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+          {EXPLORATION_LEVELS.map((level) => (
+            <Chip
+              key={level}
+              label={t(`exploration.${level}` as MessageKey)}
+              selected={user?.settings.exploration === level}
+              tone="accent"
+              onPress={() => void patch({ exploration: level as ExplorationLevel })}
+            />
+          ))}
+        </View>
+      </Section>
+
+      <Section titleKey="profile.display">
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+          {THEME_OPTIONS.map((option) => (
+            <Chip
+              key={option}
+              label={t(`theme.${option}` as MessageKey)}
+              selected={preference === option}
+              tone="accent"
+              onPress={() => setPreference(option)}
+            />
+          ))}
+        </View>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Text>{t('status.reduceMotion')}</Text>
+          <Switch
+            value={user?.settings.reduceMotion ?? theme.reduceMotion}
+            onValueChange={(value) => void patch({ reduceMotion: value })}
+            accessibilityLabel={t('status.reduceMotion')}
+          />
+        </View>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          {/* Spec section 20: haptics must be disableable. */}
+          <Text>Haptics</Text>
+          <Switch
+            value={user?.settings.hapticsEnabled ?? true}
+            onValueChange={(value) => void patch({ hapticsEnabled: value })}
+            accessibilityLabel="Haptics"
+          />
+        </View>
+
+        <Text variant="caption" tone="secondary">
+          {t('status.fontScale')}: ×{theme.fontScale.toFixed(2)}
+        </Text>
+      </Section>
+
+      <Section titleKey="profile.data">
+        <PressableRow
+          onPress={() => {
+            void clearCache().then(() => setCacheCleared(true));
+          }}
+          accessibilityLabel={t('profile.clearCache')}
+        >
+          <Text tone="warning">{t('profile.clearCache')}</Text>
+        </PressableRow>
+        {cacheCleared && (
+          <Text variant="caption" tone="secondary" accessibilityLiveRegion="polite">
+            {t('profile.cacheCleared')}
+          </Text>
+        )}
+      </Section>
+    </ScrollView>
+  );
+}

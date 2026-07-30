@@ -13,6 +13,8 @@ import type {
   ActionResponse,
   AuthTokenResponse,
   CreateActionRequest,
+  CreateTranslationRequest,
+  CreateTranslationResponse,
   CreateImpressionsRequest,
   CreateImpressionsResponse,
   FeedResponse,
@@ -75,7 +77,11 @@ export class ApiClient {
     this.baseUrl = options.baseUrl.replace(/\/+$/, '');
     this.getToken = options.getToken ?? (() => null);
     this.timeoutMs = options.timeoutMs ?? 10_000;
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    // Bound to the global object, not stored bare. Assigning `fetch` to a property and
+    // calling it as `this.fetchImpl(...)` binds `this` to the client, which browsers
+    // reject with "Illegal invocation" — and because that TypeError is thrown from inside
+    // the request's try block, it surfaced to users as "offline" on every single call.
+    this.fetchImpl = options.fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
   }
 
   private url(path: string, query?: RequestOptions['query']): string {
@@ -199,6 +205,18 @@ export class ApiClient {
   /** What the Undo control would reverse, or null when there is nothing to undo. */
   undoableAction(): Promise<ActionResponse | null> {
     return this.request<ActionResponse | null>('/actions/undoable');
+  }
+
+  /**
+   * Translate one selected span (spec section 7).
+   *
+   * The API enforces that this is a selection and not a document, refuses a span that
+   * cuts through a formula, and refuses text whose licence does not permit sending it to
+   * a provider — so those arrive here as `ApiError`s with codes the sheet turns into
+   * sentences, not as silent failures.
+   */
+  translate(body: CreateTranslationRequest): Promise<CreateTranslationResponse> {
+    return this.request<CreateTranslationResponse>('/translations', { method: 'POST', body });
   }
 
   // -- saved ---------------------------------------------------------------------

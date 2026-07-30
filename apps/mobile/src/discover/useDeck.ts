@@ -1,0 +1,173 @@
+/**
+ * Wires the deck reducer to the API, the offline cache and the impression log.
+ *
+ * The reducer holds the rules; this holds the effects. Keeping them apart is what lets
+ * `deck.test.ts` cover the awkward cases (undo before the server confirms, a failed page
+ * with cards still in hand) without a network.
+ */
+import { useCallback, useEffect, useReducer, useRef } from 'react';
+
+import type { FeedItem, SaveReason } from '@papermatch/shared-types';
+
+import { NetworkError } from '../api/client';
+import { useSession } from '../api/session';
+import { cacheFeed, readCachedFeed } from '../offline/cache';
+import {
+  type DeckState,
+  type SwipeDirection,
+  currentCard,
+  deckReducer,
+  initialDeckState,
+  nextCard,
+  shouldPrefetch,
+} from './deck';
+
+const PAGE_SIZE = 20;
+
+export interface DeckController {
+  state: DeckState;
+  current: FeedItem | null;
+  next: FeedItem | null;
+  /** Left or right; returns once the action has been sent (or has failed offline). */
+  act: (direction: SwipeDirection, reasons?: SaveReason[]) => Promise<void>;
+  undo: () => Promise<void>;
+  dismissUndo: () => void;
+  /** Called when a card becomes visible, and again with dwell when it leaves. */
+  noteImpression: (paperId: string, position: number, dwellMs?: number) => void;
+  reload: () => void;
+}
+
+export function useDeck(): DeckController {
+  const { api } = useSession();
+  const [state, dispatch] = useReducer(deckReducer, initialDeckState);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  const loadPage = useCallback(
+    async (cursor: string | null, { allowCache }: { allowCache: boolean }) => {
+      dispatch({ type: 'load_started' });
+      try {
+        const page = await api.feed({ limit: PAGE_SIZE, cursor: cursor ?? undefined });
+        dispatch({
+          type: 'page_loaded',
+          items: page.items,
+          cursor: page.nextCursor,
+          degraded: page.degraded,
+        });
+        // Only the first page is worth caching: it is what a cold offline start shows.
+        if (cursor === null) void cacheFeed(page.items, page.nextCursor);
+      } catch (error) {
+        if (error instanceof NetworkError && allowCache) {
+          const cached = await readCachedFeed();
+          if (cached && cached.items.length > 0) {
+            dispatch({
+              type: 'page_loaded',
+              items: cached.items,
+              cursor: cached.cursor,
+              // Cached content is degraded by definition; the UI says so.
+              degraded: true,
+            });
+            return;
+          }
+        }
+        dispatch({
+          type: 'load_failed',
+          reason: error instanceof NetworkError ? 'offline' : 'failed',
+        });
+      }
+    },
+    [api],
+  );
+
+  useEffect(() => {
+    void loadPage(null, { allowCache: true });
+  }, [loadPage]);
+
+  // Top up before the deck runs dry rather than when it does.
+  useEffect(() => {
+    if (shouldPrefetch(state)) {
+      void loadPage(state.cursor, { allowCache: false });
+    }
+  }, [state, loadPage]);
+
+  // Impressions are batched: one request per card would be a request per swipe.
+  useEffect(() => {
+    if (state.unsentImpressions.length === 0) return undefined;
+    const timer = setTimeout(() => {
+      const batch = stateRef.current.unsentImpressions;
+      if (batch.length === 0) return;
+      void api
+        .recordImpressions({
+          impressions: batch.map((i) => ({
+            paperId: i.paperId,
+            position: i.position,
+            dwellMs: i.dwellMs,
+          })),
+        })
+        .then(() => {
+          dispatch({ type: 'impressions_flushed', paperIds: batch.map((i) => i.paperId) });
+        })
+        .catch(() => {
+          // Left in the queue. An impression that never arrives means a card the user
+          // already saw comes back, so it is retried rather than dropped.
+        });
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [state.unsentImpressions, api]);
+
+  const act = useCallback(
+    async (direction: SwipeDirection, reasons?: SaveReason[]) => {
+      const card = currentCard(stateRef.current);
+      if (card === null) return;
+
+      dispatch({ type: 'card_acted', direction });
+      if (direction !== 'left' && direction !== 'right') return;
+
+      try {
+        const response = await api.recordAction({
+          type: direction === 'right' ? 'save' : 'skip',
+          paperId: card.paper.id,
+          payload: reasons && reasons.length > 0 ? { reasons } : {},
+        });
+        dispatch({ type: 'action_confirmed', actionId: response.action.id });
+      } catch {
+        // The card stays off the deck and the Undo control stays disabled, because there
+        // is no server-side action to reverse. Reloading brings the card back.
+      }
+    },
+    [api],
+  );
+
+  const undo = useCallback(async () => {
+    const pending = stateRef.current.pendingUndo;
+    if (pending === null || pending.actionId === null) return;
+    try {
+      await api.undoAction(pending.actionId);
+      dispatch({ type: 'undo_applied' });
+    } catch {
+      // Leave the toast up so the user can try again rather than silently losing the card.
+    }
+  }, [api]);
+
+  const dismissUndo = useCallback(() => dispatch({ type: 'undo_dismissed' }), []);
+
+  const noteImpression = useCallback((paperId: string, position: number, dwellMs?: number) => {
+    dispatch({ type: 'impression_recorded', paperId, position, dwellMs: dwellMs ?? null });
+  }, []);
+
+  const reload = useCallback(() => {
+    dispatch({ type: 'reset' });
+    void loadPage(null, { allowCache: true });
+  }, [loadPage]);
+
+  return {
+    state,
+    current: currentCard(state),
+    next: nextCard(state),
+    act,
+    undo,
+    dismissUndo,
+    noteImpression,
+    reload,
+  };
+}

@@ -212,6 +212,12 @@ export interface Translation {
   mathPlaceholders: MathPlaceholder[];
   generation: GenerationProvenance;
   createdAt: Iso8601;
+  /**
+   * True when a formula did not survive the provider round trip, so `translated` holds
+   * the original text instead. A missing formula is invisible to the reader, which is why
+   * this is surfaced rather than silently absorbed (spec section 7).
+   */
+  fellBackToOriginal: boolean;
 }
 
 export interface ExpressionCard {

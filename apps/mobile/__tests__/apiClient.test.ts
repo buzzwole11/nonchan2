@@ -107,6 +107,28 @@ describe('ApiClient', () => {
     await expect(client.health()).rejects.toBeInstanceOf(NetworkError);
   });
 
+  it('calls the global fetch with the right receiver', async () => {
+    // A browser's `fetch` throws "Illegal invocation" when called with `this` set to
+    // anything but the global object. Storing it bare on the instance and calling
+    // `this.fetchImpl(...)` did exactly that, and the resulting TypeError was reported to
+    // the user as being offline.
+    const strictFetch = function (this: unknown) {
+      if (this !== undefined && this !== globalThis) {
+        throw new TypeError('Illegal invocation');
+      }
+      return Promise.resolve(jsonResponse(200, { status: 'ok' }));
+    } as unknown as typeof fetch;
+
+    const original = globalThis.fetch;
+    globalThis.fetch = strictFetch;
+    try {
+      const client = new ApiClient({ baseUrl: 'http://api.test' });
+      await expect(client.health()).resolves.toEqual({ status: 'ok' });
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
   it('asks the feed for the discover mode explicitly', async () => {
     let url = '';
     const client = new ApiClient({

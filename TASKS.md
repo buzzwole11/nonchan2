@@ -30,14 +30,14 @@
 | 2 | PostgreSQL スキーマと migration | ✅ |
 | 3 | `PaperProvider` と `MockPaperProvider` | ✅ |
 | 4 | 50 件以上のサンプル Abstract | ✅ 合成 60 件（DECISIONS.md D-005） |
-| 5 | オンボーディング 5 画面 | Phase 1 — API 側（`/fields`、`/me/interests`、`/me/settings`）は完成済み |
-| 6 | スワイプデッキ | Phase 1 |
-| 7 | ボタン操作と Undo | Phase 1 — `actions.undoes_action_id` はスキーマにあり |
-| 8 | Saved の整然リスト | Phase 1 — `saved_papers` はスキーマにあり |
+| 5 | オンボーディング 5 画面 | ✅ Phase 1-C |
+| 6 | スワイプデッキ | ✅ Phase 1-C |
+| 7 | ボタン操作と Undo | ✅ Phase 1-B/1-C |
+| 8 | Saved の整然リスト | ✅ Phase 1-C |
 | 9 | `TranslationProvider` と `MockTranslationProvider` | ✅（`POST /translations` まで通っている） |
-| 10 | 英文選択 → ボトムシート | Phase 1 — API 側は完成済み、UI が未着手 |
+| 10 | 英文選択 → ボトムシート | ✅ Phase 1-C（文単位。実機確認は 1-C の残タスク） |
 | 11 | light/dark、Reduce Motion、Dynamic Type | ✅ 自動テストあり。実機確認は下記チェックリスト |
-| 12 | 単体・統合・E2E とCI | ✅（モバイル UI の E2E は Phase 1） |
+| 12 | 単体・統合・E2E とCI | ✅（モバイル UI の E2E は Phase 1-D） |
 
 ---
 
@@ -45,35 +45,44 @@
 
 完了条件は仕様書 29 節。
 
-### 1-A データソース接続
+### 1-A データソース接続 — 未着手（環境制約、DECISIONS.md D-016）
+> この開発環境はパッケージレジストリ以外への外向き接続を遮断しており、arXiv と OpenAlex に一度も到達できません。実レスポンスに対して動かせないコードを完了扱いにしないため、次のスライスに送っています。実装時は記録済みレスポンス（Atom XML / OpenAlex JSON）に対するオフラインテストを本体とし、疎通確認は手動手順として残します。
+
 - [ ] `ArxivPaperProvider`（Atom API、レート制限、`arXiv:` 識別子、カテゴリ→分野マッピング）
 - [ ] `OpenAlexPaperProvider`（候補発見、OA 状態、著者、識別子統合）
 - [ ] Provider ごとのサーキットブレーカーとキャッシュ（仕様書 25 節）
 - [ ] 取り込み worker（定期実行、撤回・版更新の同期）
 - [ ] 実データ 100 件以上でフィードが構成できることの確認（仕様書 29 節）
 
-### 1-B フィード API
-- [ ] `GET /feed?mode=discover&cursor=` — 表示履歴による除外、推薦理由の付与
-- [ ] `POST /impressions` — 滞在時間を含む
-- [ ] `POST /actions` / `POST /actions/{id}/undo`
-- [ ] `GET /saved` / `POST|PATCH|DELETE /saved/{paperId}`
-- [ ] オフライン用に次の 20 件を返す仕組み（仕様書 26 節）
+### 1-B フィード API ✅
+- [x] `GET /feed?mode=discover&cursor=` — 70/20/10 の枠配分、表示履歴による除外、推薦理由の付与
+- [x] `POST /impressions` — 滞在時間を含む、再投稿は更新
+- [x] `POST /actions` / `POST /actions/{id}/undo` / `GET /actions/undoable`
+- [x] `GET /saved` / `POST|PATCH|DELETE /saved/{paperId}` — 7 種の並べ替え、状態・理由・分野での絞り込み
+- [x] 再投入条件（期間経過 + スキップのみ + 長時間閲覧なし）
+- [x] `hide_topic` / `hide_author`（action ログから導出、Undo で解除）
+- [x] `actions.sequence`（migration 0002）— 「直前の action」を一意に決める
 
-### 1-C モバイル UI
-- [ ] オンボーディング 5 画面（分野 / 論文種別 / 英語 / 数式 / 冒険度）
-- [ ] Abstract カード（仕様書 6 節のカード上部・本文・下部の全項目）
-- [ ] スワイプデッキ（Reanimated + Gesture Handler、左右上下）
-- [ ] **スワイプと等価なボタン**（仕様書 20 節。ジェスチャーだけに機能を置かない）
-- [ ] Undo（スキップ直後のトースト + Profile からの取り消し）
-- [ ] 範囲選択 → フローティングツールバー → 翻訳ボトムシート
-- [ ] Saved の整然リスト（Library View の最小形）
-- [ ] 原文リンク（外部ブラウザ、WebView のナビゲーション制限）
-- [ ] オフライン 20 件のキャッシュと、API 障害時のキャッシュ表示
+### 1-C モバイル UI ✅（一部は実機確認待ち）
+- [x] オンボーディング 5 画面（分野 / 論文種別 / 英語 / 数式 / 冒険度）+ 「あとで設定する」
+- [x] Abstract カード（仕様書 6 節のカード上部・本文・下部の全項目、推薦理由つき）
+- [x] スワイプデッキ（Reanimated + Gesture Handler、左右上下）
+- [x] **スワイプと等価なボタン**（同じハンドラを呼ぶ。テストで等価性を検証）
+- [x] Undo トースト（サーバ確認前は無効、取り消すとカードがデッキ先頭に戻る）
+- [x] 文単位の範囲選択 → 翻訳ボトムシート（段階タブつき、DECISIONS.md D-018）
+- [x] Saved の整然リスト（並べ替えチップ、状態・保存理由の表示、解除）
+- [x] 原文リンク（`expo-web-browser` で外部ブラウザ。WebView は使わない）
+- [x] オフラインキャッシュ（AsyncStorage、フィード 20 件 + 保存一覧）
+- [x] タブナビゲーション 4 面（Learn は Phase 2 と明示した空画面）
+- [x] トークンを `expo-secure-store` へ（web ではメモリにフォールバック）
+- [ ] **実機で文タップ選択を確認する** — web ビルドでは react-native-gesture-handler が
+      ポインタを横取りするため未確認（DECISIONS.md D-021）。タップハンドラ自体は
+      コンポーネントテストで担保済み。
 
 ### 1-D 品質
 - [ ] Maestro による E2E（オンボーディング / スワイプ / Undo / 範囲選択翻訳 / オフライン / VoiceOver 操作）
 - [ ] Visual regression（light・dark / 小画面・大画面 / 日本語長文 / Dynamic Type / Reduce Motion）
-- [ ] トークンを `expo-secure-store` へ移す（DECISIONS.md D-007）
+- [x] トークンを `expo-secure-store` へ移す（DECISIONS.md D-007）
 - [ ] TypeScript の lint（ESLint + Prettier）。Phase 0 では tsc のみで、スタイル統一は未整備
 
 ---
@@ -169,8 +178,10 @@
 | 項目 | 状況 |
 | --- | --- |
 | TypeScript の lint | tsc のみ。ESLint / Prettier は Phase 1-D で導入 |
+| 実データ Provider | Phase 1-A。環境がネットワークを遮断（DECISIONS.md D-016） |
+| web での文タップ選択 | RNGH の web 実装がポインタを横取り。出荷対象外だが実機確認は必要 |
+| Discover の下スワイプ | 「Before you read」は Phase 2。現状は無反応 |
 | モバイルの E2E | Phase 1-D（Maestro）。Phase 0 の E2E は API レベル |
 | pgvector 列 | Phase 3（DECISIONS.md D-006） |
-| トークンの永続化 | メモリ内のみ。Phase 1-D で secure-store へ |
 | レート制限 | 未実装。実 Provider を繋ぐ Phase 1-A と同時に入れる |
 | 観測性 | 構造化ログ・トレース・Provider レイテンシ指標は Phase 1-A |
