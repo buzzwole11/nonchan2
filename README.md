@@ -4,7 +4,7 @@
 
 完全な企画・技術仕様は [`PaperMatch_SPEC.md`](./PaperMatch_SPEC.md) にあります。この README は、いま何が動くのか、どう動かすのかだけを書いています。
 
-**現在の状態: Phase 0 完了 / Phase 1 は 1-B・1-C 完了、1-A 未着手。** 実装フェーズの全体像は [`TASKS.md`](./TASKS.md)、設計上の判断とその理由は [`DECISIONS.md`](./DECISIONS.md)、構成の説明は [`ARCHITECTURE.md`](./ARCHITECTURE.md) を参照してください。
+**現在の状態: Phase 0 完了 / Phase 1 は 1-B・1-C 完了（1-A 未着手）/ Phase 2 は AI 非依存部分が完了。** 実装フェーズの全体像は [`TASKS.md`](./TASKS.md)、設計上の判断とその理由は [`DECISIONS.md`](./DECISIONS.md)、構成の説明は [`ARCHITECTURE.md`](./ARCHITECTURE.md) を参照してください。
 
 ---
 
@@ -30,9 +30,15 @@
 - **Saved（Library View）** — 7 種の並べ替え、状態・保存理由の表示、解除。
 - **オフライン** — フィード 20 件と保存一覧を端末にキャッシュし、API 障害時に表示します。
 
+## Phase 2 で追加されたもの
+
+- **Abstract の構造分類** — Background / Problem / Method / Result / Significance を規則ベースで判定し、`heuristic` として保存します（`ai` とは名乗りません — DECISIONS.md D-022）。fixture の正解ラベルに対する一致率をテストで測定しています。
+- **個人用学術英語辞典** — 翻訳シートから表現を保存。単語 / 連語 / 構文 / 一文 を自動判定し、出典の文をそのまま文脈として残します。
+- **Learn タブと復習** — 数日後に 1 件ずつ再提示。答えは「わかった / もう一度」の 2 択のみで、点数も連続記録もありません（DECISIONS.md D-023）。
+
 ### まだ無いもの
 
-arXiv / OpenAlex への実接続（Phase 1-A、この環境ではネットワークが遮断されているため未着手 — [`DECISIONS.md`](./DECISIONS.md) D-016）、Maestro による E2E、数式カード、Knowledge Canvas。着手順は [`TASKS.md`](./TASKS.md) にあります。
+arXiv / OpenAlex への実接続（Phase 1-A、この環境ではネットワークが遮断されているため未着手 — [`DECISIONS.md`](./DECISIONS.md) D-016）、実翻訳 Provider と AI 説明（同じくネットワーク制約 — D-024）、Maestro による E2E、数式カード、Knowledge Canvas。着手順は [`TASKS.md`](./TASKS.md) にあります。
 
 ---
 
@@ -94,7 +100,7 @@ make lint        # ruff + mypy + tsc
 
 DB が無い環境では統合テストと E2E テストは失敗ではなく **skip** され、起動方法が理由に表示されます。
 
-現在: Python 194 件 / TypeScript 86 件。
+現在: Python 249 件 / TypeScript 86 件。
 
 | 種別 | 対象 |
 | --- | --- |

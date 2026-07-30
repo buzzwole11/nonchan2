@@ -165,3 +165,71 @@ def test_field_weights_are_stored_for_canvas_colouring(db_session: Session) -> N
     weights = {fw.field_id: fw.weight for fw in paper.field_weights}
     assert weights
     assert all(0.0 <= w <= 1.0 for w in weights.values())
+
+
+def test_a_paper_without_source_structure_gets_a_heuristic_one(db_session: Session) -> None:
+    """Spec section 8: every abstract gets structure, labelled with how it was found.
+
+    Providers that publish structured abstracts are authoritative. Everything else — which
+    is nearly all of arXiv — goes through the classifier, and the label says so.
+    """
+    from datetime import UTC, datetime
+
+    from papermatch_api.providers.base import PaperRecord
+    from papermatch_api.services.ingestion import upsert_record
+
+    load_fields(db_session, FIXTURES_DIR)
+    record = PaperRecord(
+        canonical_id="arxiv:2501.00001",
+        title="A Paper With No Published Structure",
+        abstract=(
+            "Expander graphs combine sparsity with strong connectivity. "
+            "However, existing constructions cannot reach the required degree. "
+            "We construct an explicit family using a zig-zag product. "
+            "We obtain a spectral gap of 0.31 at degree eight. "
+            "This suggests the construction extends to higher degrees."
+        ),
+        authors=({"name": "K. Aoki"},),
+        year=2025,
+        identifiers=({"kind": "arxiv", "value": "2501.00001"},),
+        source_provider="arxiv",
+        source_url="https://arxiv.org/abs/2501.00001",
+        acquired_at=datetime.now(tz=UTC),
+        license_id="CC-BY-4.0",
+        license_url=None,
+        abstract_redistributable=True,
+        primary_field_id="math.CO",
+        field_weights={"math.CO": 0.7, "math": 0.2},
+    )
+
+    paper, _ = upsert_record(db_session, record)
+    segments = list(
+        db_session.execute(
+            select(AbstractSegment).where(AbstractSegment.paper_id == paper.id)
+        ).scalars()
+    )
+
+    assert len(segments) == 5
+    assert {s.detected_by for s in segments} == {"heuristic"}
+    assert [s.section for s in sorted(segments, key=lambda s: s.start_offset)] == [
+        "background",
+        "problem",
+        "method",
+        "result",
+        "significance",
+    ]
+    # A heuristic never claims certainty.
+    assert all(s.confidence < 1.0 for s in segments)
+    # And the abstract itself is untouched.
+    assert paper.abstract == record.abstract
+
+
+def test_source_supplied_structure_is_preferred_over_the_heuristic(
+    db_session: Session,
+) -> None:
+    load_fields(db_session, FIXTURES_DIR)
+    ingest(db_session, MockPaperProvider(FIXTURES_DIR), query=PaperQuery(limit=5))
+
+    segments = list(db_session.execute(select(AbstractSegment)).scalars())
+    assert segments
+    assert {s.detected_by for s in segments} == {"source"}

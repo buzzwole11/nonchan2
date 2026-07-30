@@ -289,8 +289,8 @@ class AbstractSegment(Base):
     __tablename__ = "abstract_segments"
     __table_args__ = (
         vocab_check("section", "abstractSection"),
+        vocab_check("detected_by", "detectionMethod"),
         CheckConstraint("start_offset >= 0 AND end_offset > start_offset", name="ck_segment_range"),
-        CheckConstraint("detected_by IN ('ai', 'source', 'human')", name="ck_segment_detected_by"),
         Index("ix_abstract_segments_paper", "paper_id"),
     )
 
@@ -301,7 +301,7 @@ class AbstractSegment(Base):
     start_offset: Mapped[int] = mapped_column(Integer, nullable=False)
     end_offset: Mapped[int] = mapped_column(Integer, nullable=False)
     section: Mapped[str] = mapped_column(String(32), nullable=False)
-    detected_by: Mapped[str] = mapped_column(String(16), nullable=False, default="ai")
+    detected_by: Mapped[str] = mapped_column(String(16), nullable=False, default="heuristic")
     confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
 
 
@@ -501,10 +501,20 @@ class Translation(Base, GenerationProvenanceMixin):
 
 
 class ExpressionCard(Base, TimestampMixin):
-    """Personal academic-English dictionary entry (spec section 9)."""
+    """Personal academic-English dictionary entry (spec section 9).
+
+    The review columns live here rather than in a separate schedule table: an entry has
+    exactly one schedule, and spec section 9 asks for a gentle "one item a few days later"
+    rather than a full spaced-repetition system with its own history.
+    """
 
     __tablename__ = "expression_cards"
-    __table_args__ = (Index("ix_expressions_user", "user_id"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "phrase", name="uq_expression_user_phrase"),
+        vocab_check("kind", "expressionKind"),
+        Index("ix_expressions_user", "user_id"),
+        Index("ix_expressions_due", "user_id", "next_review_at"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UuidType, primary_key=True, default=_uuid)
     user_id: Mapped[uuid.UUID] = mapped_column(
@@ -513,9 +523,18 @@ class ExpressionCard(Base, TimestampMixin):
     source_paper_id: Mapped[uuid.UUID | None] = mapped_column(
         UuidType, ForeignKey("papers.id", ondelete="SET NULL"), nullable=True
     )
+    kind: Mapped[str] = mapped_column(String(32), nullable=False, default="word")
     phrase: Mapped[str] = mapped_column(Text, nullable=False)
     meaning: Mapped[str] = mapped_column(Text, nullable=False)
     examples: Mapped[list[str]] = mapped_column(JsonType, nullable=False, default=list)
+    #: The sentence the phrase came from. Spec section 9 asks for 実際に読んだ論文の用例 —
+    #: an entry without its context is a flashcard, not a reading memory.
+    context: Mapped[str | None] = mapped_column(Text, nullable=True)
+    review_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_reviewed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    next_review_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 # ---------------------------------------------------------------------- mathematics

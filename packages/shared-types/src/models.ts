@@ -8,6 +8,7 @@
 import type {
   AbstractSection,
   ActionType,
+  DetectionMethod,
   CanvasStyle,
   EnglishLevel,
   ExplorationLevel,
@@ -23,6 +24,7 @@ import type {
   RelationType,
   RetractionStatus,
   SaveReason,
+  ExpressionKind,
   SavedStatus,
   SourceProvider,
   TranslationStage,
@@ -75,8 +77,9 @@ export interface AbstractSegment {
   start: number;
   end: number;
   section: AbstractSection;
-  /** Section 8: AI-detected structure is labelled as such and never edits the original. */
-  detectedBy: 'ai' | 'source' | 'human';
+  /** Section 8: detected structure is labelled with how it was found, and never edits
+   * the original text. */
+  detectedBy: DetectionMethod;
   confidence: number;
 }
 
@@ -220,13 +223,21 @@ export interface Translation {
   fellBackToOriginal: boolean;
 }
 
+/** Section 9: an entry in the reader's own academic-English dictionary. */
 export interface ExpressionCard {
   id: Uuid;
+  kind: ExpressionKind;
   phrase: string;
   meaning: string;
   examples: string[];
-  sourcePaperId: Uuid;
+  sourcePaperId: Uuid | null;
+  /** The sentence it was taken from, so the entry keeps its context. */
+  context: string | null;
   createdAt: Iso8601;
+  reviewCount: number;
+  lastReviewedAt: Iso8601 | null;
+  /** When this entry is next due (spec section 9: 数日後に1件提示). */
+  nextReviewAt: Iso8601 | null;
 }
 
 /** Section 11: LaTeX is the canonical form. Images are never the record of truth. */

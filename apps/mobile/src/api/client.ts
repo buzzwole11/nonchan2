@@ -13,8 +13,11 @@ import type {
   ActionResponse,
   AuthTokenResponse,
   CreateActionRequest,
+  CreateExpressionRequest,
   CreateTranslationRequest,
   CreateTranslationResponse,
+  ExpressionListResponse,
+  ExpressionResponse,
   CreateImpressionsRequest,
   CreateImpressionsResponse,
   FeedResponse,
@@ -26,6 +29,8 @@ import type {
   SavedListQuery,
   SavedListResponse,
   SavedPaperResponse,
+  ReviewOutcome,
+  ReviewQueueResponse,
   UndoResponse,
   UpdateSavedRequest,
   User,
@@ -244,5 +249,33 @@ export class ApiClient {
 
   removeSaved(paperId: string): Promise<void> {
     return this.request<void>(`/saved/${paperId}`, { method: 'DELETE' });
+  }
+
+  // -- learn ---------------------------------------------------------------------
+
+  saveExpression(body: CreateExpressionRequest): Promise<ExpressionResponse> {
+    return this.request<ExpressionResponse>('/expressions', { method: 'POST', body });
+  }
+
+  expressions(params: { kind?: string; limit?: number; cursor?: string } = {}): Promise<ExpressionListResponse> {
+    return this.request<ExpressionListResponse>('/expressions', {
+      query: { kind: params.kind, limit: params.limit, cursor: params.cursor },
+    });
+  }
+
+  removeExpression(expressionId: string): Promise<void> {
+    return this.request<void>(`/expressions/${expressionId}`, { method: 'DELETE' });
+  }
+
+  /** What is ready to be seen again (spec section 9: a nudge, not a backlog). */
+  reviewQueue(limit = 5): Promise<ReviewQueueResponse> {
+    return this.request<ReviewQueueResponse>('/learn/review', { query: { limit } });
+  }
+
+  submitReview(expressionId: string, outcome: ReviewOutcome): Promise<ExpressionResponse> {
+    return this.request<ExpressionResponse>(`/learn/review/${expressionId}`, {
+      method: 'POST',
+      body: { outcome },
+    });
   }
 }

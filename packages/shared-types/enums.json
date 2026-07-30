@@ -7,68 +7,202 @@
   },
   "identifierKind": {
     "$note": "Section 16: canonical-id precedence, highest first.",
-    "values": ["doi", "arxiv", "semantic_scholar", "openalex", "title_author_year"]
+    "values": [
+      "doi",
+      "arxiv",
+      "semantic_scholar",
+      "openalex",
+      "title_author_year"
+    ]
   },
   "sourceProvider": {
-    "values": ["arxiv", "openalex", "semantic_scholar", "crossref", "mock", "manual"]
+    "values": [
+      "arxiv",
+      "openalex",
+      "semantic_scholar",
+      "crossref",
+      "mock",
+      "manual"
+    ]
   },
   "paperType": {
     "$note": "Section 18: 論文種別.",
-    "values": ["original", "review", "lecture_notes", "conference_paper", "preprint", "published", "classic", "recent"]
+    "values": [
+      "original",
+      "review",
+      "lecture_notes",
+      "conference_paper",
+      "preprint",
+      "published",
+      "classic",
+      "recent"
+    ]
   },
   "openAccessStatus": {
-    "values": ["gold", "green", "hybrid", "bronze", "closed", "unknown"]
+    "values": [
+      "gold",
+      "green",
+      "hybrid",
+      "bronze",
+      "closed",
+      "unknown"
+    ]
   },
   "retractionStatus": {
     "$note": "Section 21: withdrawal and correction state must be representable and refreshable.",
-    "values": ["none", "corrected", "concern_expressed", "withdrawn", "retracted"]
+    "values": [
+      "none",
+      "corrected",
+      "concern_expressed",
+      "withdrawn",
+      "retracted"
+    ]
   },
   "englishLevel": {
-    "values": ["beginner", "intermediate", "advanced", "native_like"]
+    "values": [
+      "beginner",
+      "intermediate",
+      "advanced",
+      "native_like"
+    ]
   },
   "mathLevel": {
     "$note": "Section 18: Level 0-4.",
-    "values": ["level_0", "level_1", "level_2", "level_3", "level_4"]
+    "values": [
+      "level_0",
+      "level_1",
+      "level_2",
+      "level_3",
+      "level_4"
+    ]
   },
   "explorationLevel": {
     "$note": "Section 18: 推薦の冒険度.",
-    "values": ["focused", "balanced", "adventurous"]
+    "values": [
+      "focused",
+      "balanced",
+      "adventurous"
+    ]
   },
   "interestMode": {
     "$note": "Section 18: 研究分野の強さ.",
-    "values": ["main", "occasional", "serendipity"]
+    "values": [
+      "main",
+      "occasional",
+      "serendipity"
+    ]
   },
   "abstractSection": {
     "$note": "Section 8: structural roles detected in an abstract.",
-    "values": ["background", "problem", "method", "result", "significance"]
+    "values": [
+      "background",
+      "problem",
+      "method",
+      "result",
+      "significance"
+    ]
+  },
+  "detectionMethod": {
+    "$note": "Section 8: how a structural label was produced. A rule-based pass is 'heuristic', not 'ai' — conflating them would overstate what the label is worth.",
+    "values": [
+      "source",
+      "heuristic",
+      "ai",
+      "human"
+    ]
   },
   "saveReason": {
     "$note": "Section 9: optional tags attached on save.",
-    "values": ["interesting", "read_later", "english_expression", "math", "research_related", "vague_interest"]
+    "values": [
+      "interesting",
+      "read_later",
+      "english_expression",
+      "math",
+      "research_related",
+      "vague_interest"
+    ]
+  },
+  "expressionKind": {
+    "$note": "Section 9: 個人用学術英語辞典 — 単語 / 連語 / 構文 / 一文.",
+    "values": [
+      "word",
+      "collocation",
+      "pattern",
+      "sentence"
+    ]
+  },
+  "reviewOutcome": {
+    "$note": "Section 9/10: 派手な点数化はせず — only 'again' and 'got_it'.",
+    "values": [
+      "again",
+      "got_it"
+    ]
   },
   "savedStatus": {
     "$note": "Section 9: reading state of a saved paper.",
-    "values": ["unread", "abstract_in_progress", "abstract_done", "source_opened", "focus", "finished", "archived"]
+    "values": [
+      "unread",
+      "abstract_in_progress",
+      "abstract_done",
+      "source_opened",
+      "focus",
+      "finished",
+      "archived"
+    ]
   },
   "actionType": {
     "$note": "Section 23: Action.",
-    "values": ["skip", "save", "open_source", "translate", "expand_math", "hide_topic", "hide_author", "undo"]
+    "values": [
+      "skip",
+      "save",
+      "open_source",
+      "translate",
+      "expand_math",
+      "hide_topic",
+      "hide_author",
+      "undo"
+    ]
   },
   "feedReason": {
     "$note": "Section 6: recommendation reasons must be explainable, never a single opaque score.",
-    "values": ["similar_to_saved", "matches_field", "adjacent_field", "foundational", "recent"]
+    "values": [
+      "similar_to_saved",
+      "matches_field",
+      "adjacent_field",
+      "foundational",
+      "recent"
+    ]
   },
   "translationStyle": {
     "$note": "Section 7: 翻訳設定.",
-    "values": ["natural", "faithful", "literal", "academic", "plain_japanese"]
+    "values": [
+      "natural",
+      "faithful",
+      "literal",
+      "academic",
+      "plain_japanese"
+    ]
   },
   "translationStage": {
     "$note": "Section 7: 段階的ヒント 1-6.",
-    "values": ["hard_words", "sentence_skeleton", "phrase_structure", "literal", "natural", "domain_meaning"]
+    "values": [
+      "hard_words",
+      "sentence_skeleton",
+      "phrase_structure",
+      "literal",
+      "natural",
+      "domain_meaning"
+    ]
   },
   "provenanceKind": {
     "$note": "Section 11: origin label shown next to every formula and explanation.",
-    "values": ["original", "verified_step", "ai_explanation", "assumption", "human_reviewed"]
+    "values": [
+      "original",
+      "verified_step",
+      "ai_explanation",
+      "assumption",
+      "human_reviewed"
+    ]
   },
   "verificationStatus": {
     "$note": "Section 12: unverified derivations are hidden by default.",
@@ -95,17 +229,37 @@
   },
   "relationType": {
     "$note": "Section 17: relation labels always keep their evidence.",
-    "values": ["related", "contrasting", "foundational", "follow_up"]
+    "values": [
+      "related",
+      "contrasting",
+      "foundational",
+      "follow_up"
+    ]
   },
   "canvasStyle": {
     "$note": "Section 13: Mosaic ships first.",
-    "values": ["mosaic", "constellation", "landscape", "spectrum"]
+    "values": [
+      "mosaic",
+      "constellation",
+      "landscape",
+      "spectrum"
+    ]
   },
   "metricSignature": {
     "$note": "Section 11: never silently convert the original convention.",
-    "values": ["as_published", "mostly_minus", "mostly_plus"]
+    "values": [
+      "as_published",
+      "mostly_minus",
+      "mostly_plus"
+    ]
   },
   "unitSystem": {
-    "values": ["si", "gaussian", "heaviside_lorentz", "natural", "geometric"]
+    "values": [
+      "si",
+      "gaussian",
+      "heaviside_lorentz",
+      "natural",
+      "geometric"
+    ]
   }
 }

@@ -440,6 +440,61 @@ class UndoResponse(CamelModel):
     restored_paper_id: uuid.UUID | None
 
 
+# ------------------------------------------------------------------------ learning
+
+
+class ExpressionOut(CamelModel):
+    id: uuid.UUID
+    kind: str
+    phrase: str
+    meaning: str
+    examples: list[str]
+    source_paper_id: uuid.UUID | None
+    context: str | None
+    created_at: datetime
+    review_count: int
+    last_reviewed_at: datetime | None
+    next_review_at: datetime | None
+
+
+class CreateExpressionRequest(CamelModel):
+    phrase: str = Field(min_length=1, max_length=600)
+    meaning: str = Field(default="", max_length=2000)
+    #: Omitted means "work it out from the phrase" (word / collocation / pattern / sentence).
+    kind: str | None = None
+    #: The sentence it came from, so the entry keeps its context (spec section 9).
+    context: str | None = Field(default=None, max_length=4000)
+    source_paper_id: uuid.UUID | None = None
+    example: str | None = Field(default=None, max_length=4000)
+
+    _v_kind = field_validator("kind")(_in_vocab("expressionKind"))
+
+
+class ExpressionListResponse(CamelModel):
+    expressions: list[ExpressionOut]
+    total: int
+    #: How many are ready to be seen again right now.
+    due_count: int
+
+
+class ExpressionResponse(CamelModel):
+    expression: ExpressionOut
+    created: bool
+
+
+class ReviewRequest(CamelModel):
+    outcome: str
+
+    _v_outcome = field_validator("outcome")(_in_vocab("reviewOutcome"))
+
+
+class ReviewQueueResponse(CamelModel):
+    """Spec section 9: 数日後に保存論文の表現を1件提示 — a nudge, not a queue to grind."""
+
+    due: list[ExpressionOut]
+    total_due: int
+
+
 # ---------------------------------------------------------------------------- error
 
 

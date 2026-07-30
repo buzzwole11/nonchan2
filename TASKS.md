@@ -87,17 +87,22 @@
 
 ---
 
-## Phase 2 — 学習体験
+## Phase 2 — 学習体験（AI 非依存部分は完了）
 
-- [ ] 段階ヒント 6 段階の UI（難語 / 骨格 / 句構造 / 直訳 / 自然訳 / 分野的意味）
-- [ ] 実翻訳 Provider の接続（`ExplanationProvider` 含む）
-- [ ] Abstract 構造分類（AI 判定ラベル付き。fixture の `detectedBy: source` を正解データとして評価）
-- [ ] Before you read（背景知識 3 項目、専門用語 3–5 項目）
-- [ ] Why it matters（AI 生成であることの明示）
-- [ ] 用語・表現の保存（`expression_cards`）
-- [ ] 保存理由チップ
-- [ ] Learn タブと復習の再提示
-- [ ] 英語難易度の推定を実データで較正
+AI が要る項目は環境制約で未着手です（DECISIONS.md D-024）。
+
+- [x] 段階ヒント 6 段階の UI（翻訳シートのタブ。中身の充実は実 Provider 接続後）
+- [x] **Abstract 構造分類** — キューフレーズ + 位置による規則ベース。`heuristic` として保存し、
+      fixture の `detectedBy: source` を正解データに一致率をテストで測定（平均 0.89 / 完全一致 34-60）
+- [x] **用語・表現の保存**（`expression_cards`）— 単語 / 連語 / 構文 / 一文 の自動判定、
+      文脈の保持、同一句のマージ
+- [x] **Learn タブと復習の再提示** — 2 択・固定間隔・点数なし（DECISIONS.md D-023）
+- [x] 翻訳シートからの「表現を保存」
+- [ ] 実翻訳 Provider の接続（`ExplanationProvider` 含む）— ネットワーク遮断のため未着手
+- [ ] Before you read（背景知識 3 項目、専門用語 3–5 項目）— AI 生成部分が必要
+- [ ] Why it matters（AI 生成であることの明示）— 同上
+- [ ] 保存理由チップの UI（API は完成済み、右スワイプ時の選択 UI が未実装）
+- [ ] 英語難易度の推定を実データで較正（実データ取得が Phase 1-A 待ち）
 
 ---
 
@@ -185,3 +190,4 @@
 | pgvector 列 | Phase 3（DECISIONS.md D-006） |
 | レート制限 | 未実装。実 Provider を繋ぐ Phase 1-A と同時に入れる |
 | 観測性 | 構造化ログ・トレース・Provider レイテンシ指標は Phase 1-A |
+| AI 説明・実翻訳 | 環境がネットワークを遮断（DECISIONS.md D-024）。interface は Phase 0 から存在 |

@@ -42,6 +42,12 @@ export const INTEREST_MODES = ['main', 'occasional', 'serendipity'] as const;
 
 export const ABSTRACT_SECTIONS = ['background', 'problem', 'method', 'result', 'significance'] as const;
 
+/**
+ * Section 8: how a structural label was produced. A rule-based pass is `heuristic`, not
+ * `ai` — labelling it `ai` would claim more for the label than it is worth.
+ */
+export const DETECTION_METHODS = ['source', 'heuristic', 'ai', 'human'] as const;
+
 export const SAVE_REASONS = [
   'interesting',
   'read_later',
@@ -50,6 +56,12 @@ export const SAVE_REASONS = [
   'research_related',
   'vague_interest',
 ] as const;
+
+/** Section 9: 個人用学術英語辞典 — 単語 / 連語 / 構文 / 一文. */
+export const EXPRESSION_KINDS = ['word', 'collocation', 'pattern', 'sentence'] as const;
+
+/** Section 9/10: 派手な点数化はせず — the review answer is binary and unscored. */
+export const REVIEW_OUTCOMES = ['again', 'got_it'] as const;
 
 export const SAVED_STATUSES = [
   'unread',
@@ -136,6 +148,9 @@ export type MathLevel = (typeof MATH_LEVELS)[number];
 export type ExplorationLevel = (typeof EXPLORATION_LEVELS)[number];
 export type InterestMode = (typeof INTEREST_MODES)[number];
 export type AbstractSection = (typeof ABSTRACT_SECTIONS)[number];
+export type DetectionMethod = (typeof DETECTION_METHODS)[number];
+export type ExpressionKind = (typeof EXPRESSION_KINDS)[number];
+export type ReviewOutcome = (typeof REVIEW_OUTCOMES)[number];
 export type SaveReason = (typeof SAVE_REASONS)[number];
 export type SavedStatus = (typeof SAVED_STATUSES)[number];
 export type ActionType = (typeof ACTION_TYPES)[number];
@@ -162,7 +177,10 @@ export const VOCABULARY_TUPLES: Record<string, readonly string[]> = {
   explorationLevel: EXPLORATION_LEVELS,
   interestMode: INTEREST_MODES,
   abstractSection: ABSTRACT_SECTIONS,
+  detectionMethod: DETECTION_METHODS,
   saveReason: SAVE_REASONS,
+  expressionKind: EXPRESSION_KINDS,
+  reviewOutcome: REVIEW_OUTCOMES,
   savedStatus: SAVED_STATUSES,
   actionType: ACTION_TYPES,
   feedReason: FEED_REASONS,

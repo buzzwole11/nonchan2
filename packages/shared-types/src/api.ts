@@ -6,6 +6,7 @@
  * here first so the client and the API move together.
  */
 import type {
+  ExpressionCard,
   FeedItem,
   Interest,
   Iso8601,
@@ -17,6 +18,8 @@ import type {
 } from './models.ts';
 import type {
   ActionType,
+  ExpressionKind,
+  ReviewOutcome,
   SaveReason,
   SavedStatus,
   TranslationStage,
@@ -185,6 +188,40 @@ export interface UpdateSavedRequest {
   reasons?: SaveReason[];
   notes?: string | null;
   priority?: number;
+}
+
+// ----------------------------------------------------------------------------- learn
+
+export interface CreateExpressionRequest {
+  phrase: string;
+  meaning?: string;
+  /** Omit to let the API work it out from the phrase. */
+  kind?: ExpressionKind;
+  /** The sentence it came from (spec section 9: 実際に読んだ論文の用例). */
+  context?: string | null;
+  sourcePaperId?: string | null;
+  example?: string | null;
+}
+
+export interface ExpressionResponse {
+  expression: ExpressionCard;
+  /** False when the phrase was already saved and this call merged into it. */
+  created: boolean;
+}
+
+export interface ExpressionListResponse {
+  expressions: ExpressionCard[];
+  total: number;
+  dueCount: number;
+}
+
+export interface ReviewRequest {
+  outcome: ReviewOutcome;
+}
+
+export interface ReviewQueueResponse {
+  due: ExpressionCard[];
+  totalDue: number;
 }
 
 export interface HealthResponse {

@@ -31,6 +31,7 @@ from papermatch_api.models import (
     PaperIdentifier,
 )
 from papermatch_api.providers.base import PaperProvider, PaperQuery, PaperRecord
+from papermatch_api.services.structure import classify
 from papermatch_api.text.dedup import compute_identity
 from papermatch_api.text.normalize import normalize_title
 
@@ -148,9 +149,12 @@ def _apply_field_weights(session: Session, paper: Paper, record: PaperRecord) ->
 
 
 def _apply_segments(session: Session, paper: Paper, raw: dict[str, Any]) -> None:
-    segments = raw.get("abstractSegments") or []
-    if not segments:
-        return
+    """Store the abstract's structure, from the source when it has one.
+
+    A provider that publishes structured abstracts (some journals do) is authoritative;
+    everything else goes through the heuristic classifier, which labels its output
+    ``heuristic`` so a reader can tell the difference (spec section 8).
+    """
     existing = (
         session.execute(select(AbstractSegment).where(AbstractSegment.paper_id == paper.id))
         .scalars()
@@ -158,15 +162,31 @@ def _apply_segments(session: Session, paper: Paper, raw: dict[str, Any]) -> None
     )
     if existing:
         return
-    for segment in segments:
+
+    segments = raw.get("abstractSegments") or []
+    if segments:
+        for segment in segments:
+            session.add(
+                AbstractSegment(
+                    paper_id=paper.id,
+                    start_offset=int(segment["start"]),
+                    end_offset=int(segment["end"]),
+                    section=segment["section"],
+                    detected_by=segment.get("detectedBy", "source"),
+                    confidence=float(segment.get("confidence", 0.0)),
+                )
+            )
+        return
+
+    for detected in classify(paper.abstract):
         session.add(
             AbstractSegment(
                 paper_id=paper.id,
-                start_offset=int(segment["start"]),
-                end_offset=int(segment["end"]),
-                section=segment["section"],
-                detected_by=segment.get("detectedBy", "ai"),
-                confidence=float(segment.get("confidence", 0.0)),
+                start_offset=detected.start,
+                end_offset=detected.end,
+                section=detected.section,
+                detected_by=detected.detected_by,
+                confidence=detected.confidence,
             )
         )
 

@@ -49,6 +49,9 @@ type SheetState =
   | { kind: 'ready'; translated: string; fellBack: boolean; notice: string | null }
   | { kind: 'error'; messageKey: MessageKey };
 
+/** Result of the "save expression" action, shown as a sentence rather than a toast. */
+type SaveState = { kind: 'idle' } | { kind: 'saving' } | { kind: 'done'; messageKey: MessageKey };
+
 /** Map the API's error codes onto sentences the reader can act on. */
 function errorMessageKey(error: unknown): MessageKey {
   if (error instanceof NetworkError) return 'status.api.offline';
@@ -79,6 +82,7 @@ export function TranslationSheet({
   const { api } = useSession();
   const [stage, setStage] = useState<TranslationStage>(initialStage);
   const [state, setState] = useState<SheetState>({ kind: 'idle' });
+  const [saveState, setSaveState] = useState<SaveState>({ kind: 'idle' });
   const t = (key: MessageKey, params?: Record<string, string | number>) =>
     translate(locale, key, params);
 
@@ -113,6 +117,7 @@ export function TranslationSheet({
   useEffect(() => {
     if (!visible) {
       setState({ kind: 'idle' });
+      setSaveState({ kind: 'idle' });
       setStage(initialStage);
       return;
     }
@@ -122,6 +127,32 @@ export function TranslationSheet({
   function chooseStage(next: TranslationStage) {
     setStage(next);
     void run(next);
+  }
+
+  /**
+   * Save the selection to the personal dictionary (spec section 7: 表現保存).
+   *
+   * The meaning saved is whatever the sheet is currently showing, and the selection
+   * itself becomes the entry's context — spec section 9 wants 実際に読んだ論文の用例, and
+   * the sentence the reader was looking at is exactly that.
+   */
+  async function saveExpression(): Promise<void> {
+    if (selection === null || saveState.kind === 'saving') return;
+    setSaveState({ kind: 'saving' });
+    try {
+      const response = await api.saveExpression({
+        phrase: selection.exactText,
+        meaning: state.kind === 'ready' ? state.translated : '',
+        context: selection.exactText,
+        sourcePaperId: paperId,
+      });
+      setSaveState({
+        kind: 'done',
+        messageKey: response.created ? 'translate.expressionSaved' : 'translate.expressionExists',
+      });
+    } catch {
+      setSaveState({ kind: 'done', messageKey: 'translate.saveFailed' });
+    }
   }
 
   return (
@@ -193,7 +224,7 @@ export function TranslationSheet({
             </View>
           </ScrollView>
 
-          <ScrollView style={{ maxHeight: 240 }}>
+          <ScrollView style={{ maxHeight: 220 }}>
             {state.kind === 'loading' && (
               <ActivityIndicator accessibilityLabel={t('translate.loading')} color={theme.color.accent} />
             )}
@@ -219,6 +250,25 @@ export function TranslationSheet({
               </View>
             )}
           </ScrollView>
+
+          <View style={{ gap: theme.spacing.xs }}>
+            <PressableRow
+              onPress={() => void saveExpression()}
+              disabled={selection === null || saveState.kind === 'saving'}
+              accessibilityLabel={t('translate.saveExpression')}
+            >
+              <Text tone="accent">{t('translate.saveExpression')}</Text>
+            </PressableRow>
+            {saveState.kind === 'done' && (
+              <Text
+                variant="caption"
+                tone={saveState.messageKey === 'translate.saveFailed' ? 'warning' : 'saved'}
+                accessibilityLiveRegion="polite"
+              >
+                {t(saveState.messageKey)}
+              </Text>
+            )}
+          </View>
         </View>
       </View>
     </Modal>
