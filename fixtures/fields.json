@@ -1,0 +1,25 @@
+{
+  "$meta": {
+    "note": "Hierarchical field taxonomy for onboarding (spec section 18) and canvas colouring (spec section 13). Ids follow arXiv category names where one exists so real ingestion in Phase 1 can map onto them without a rename.",
+    "version": "0.1.0"
+  },
+  "fields": [
+    { "id": "physics", "parentId": null, "label": { "en": "Physics", "ja": "物理学" }, "color": "#2F6FED" },
+    { "id": "hep-th", "parentId": "physics", "label": { "en": "High Energy Physics — Theory", "ja": "高エネルギー物理（理論）" }, "color": "#3B5BDB" },
+    { "id": "cond-mat", "parentId": "physics", "label": { "en": "Condensed Matter", "ja": "物性物理" }, "color": "#1C7ED6" },
+    { "id": "quant-ph", "parentId": "physics", "label": { "en": "Quantum Physics", "ja": "量子物理" }, "color": "#5F3DC4" },
+    { "id": "astro-ph", "parentId": "physics", "label": { "en": "Astrophysics", "ja": "天体物理" }, "color": "#0C8599" },
+
+    { "id": "math", "parentId": null, "label": { "en": "Mathematics", "ja": "数学" }, "color": "#19A974" },
+    { "id": "math.AP", "parentId": "math", "label": { "en": "Analysis of PDEs", "ja": "偏微分方程式論" }, "color": "#2F9E44" },
+    { "id": "math.CO", "parentId": "math", "label": { "en": "Combinatorics", "ja": "組合せ論" }, "color": "#66A80F" },
+    { "id": "math.NT", "parentId": "math", "label": { "en": "Number Theory", "ja": "数論" }, "color": "#087F5B" },
+    { "id": "math.PR", "parentId": "math", "label": { "en": "Probability", "ja": "確率論" }, "color": "#37B24D" },
+
+    { "id": "cs", "parentId": null, "label": { "en": "Computer Science", "ja": "情報科学" }, "color": "#D68C24" },
+    { "id": "cs.LG", "parentId": "cs", "label": { "en": "Machine Learning", "ja": "機械学習" }, "color": "#E8590C" },
+    { "id": "cs.DS", "parentId": "cs", "label": { "en": "Data Structures and Algorithms", "ja": "データ構造とアルゴリズム" }, "color": "#F08C00" },
+    { "id": "cs.CL", "parentId": "cs", "label": { "en": "Computation and Language", "ja": "自然言語処理" }, "color": "#C2255C" },
+    { "id": "cs.CR", "parentId": "cs", "label": { "en": "Cryptography and Security", "ja": "暗号とセキュリティ" }, "color": "#A61E4D" }
+  ]
+}

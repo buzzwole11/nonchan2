@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PAPERMATCH_ENVIRONMENT: test
+
+jobs:
+  api:
+    name: API (Python)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        # pgvector image so the Phase 3 migration can be tested on the same service
+        # without changing CI (DECISIONS.md D-006).
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: papermatch
+          POSTGRES_PASSWORD: papermatch
+          POSTGRES_DB: papermatch_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U papermatch"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PAPERMATCH_DATABASE_URL: postgresql+psycopg://papermatch:papermatch@localhost:5432/papermatch_test
+      PAPERMATCH_TEST_DATABASE_URL: postgresql+psycopg://papermatch:papermatch@localhost:5432/papermatch_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        working-directory: apps/api
+        run: |
+          uv venv --python 3.11
+          uv pip install -e ".[dev]"
+
+      - name: Lint
+        working-directory: apps/api
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Type check
+        working-directory: apps/api
+        run: uv run mypy papermatch_api
+
+      - name: Test
+        working-directory: apps/api
+        run: uv run pytest -v
+
+      - name: Verify migrations apply to an empty database
+        working-directory: apps/api
+        env:
+          PAPERMATCH_DATABASE_URL: postgresql+psycopg://papermatch:papermatch@localhost:5432/papermatch_ci
+        run: |
+          PGPASSWORD=papermatch createdb -h localhost -U papermatch papermatch_ci
+          uv run alembic upgrade head
+          uv run python -m papermatch_api.cli seed
+
+  typescript:
+    name: Mobile & packages (TypeScript)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+  fixtures:
+    name: Fixtures are reproducible
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Regenerate and diff
+        # The generator is deterministic, so a committed corpus that differs from a fresh
+        # run means the two have drifted apart.
+        run: |
+          node scripts/generate-fixtures.mjs
+          git diff --exit-code fixtures/papers.sample.json

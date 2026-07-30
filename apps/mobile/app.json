@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "PaperMatch",
+    "slug": "papermatch",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "papermatch",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.papermatch.mobile"
+    },
+    "android": {
+      "package": "app.papermatch.mobile",
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "apiBaseUrl": "http://localhost:8000"
+    }
+  }
+}

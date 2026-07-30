@@ -1,0 +1,35 @@
+# Node
+node_modules/
+npm-debug.log*
+.expo/
+.expo-shared/
+dist/
+web-build/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Local data
+*.sqlite3
+/tmp-artifacts/

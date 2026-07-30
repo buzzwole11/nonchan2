@@ -1,0 +1,27 @@
+{
+  "name": "papermatch",
+  "private": true,
+  "version": "0.1.0",
+  "description": "PaperMatch monorepo — Abstract discovery, partial translation, formula understanding, and knowledge canvas for academic papers.",
+  "workspaces": [
+    "packages/*",
+    "apps/mobile"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "fixtures:generate": "node scripts/generate-fixtures.mjs",
+    "api:dev": "cd apps/api && uv run uvicorn papermatch_api.main:app --reload --port 8000",
+    "api:test": "cd apps/api && uv run pytest",
+    "db:up": "docker compose up -d db redis",
+    "db:migrate": "cd apps/api && uv run alembic upgrade head"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}
