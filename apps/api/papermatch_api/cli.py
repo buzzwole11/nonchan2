@@ -14,6 +14,7 @@ from papermatch_api.db import session_scope
 from papermatch_api.providers.base import PaperQuery
 from papermatch_api.providers.registry import get_paper_provider
 from papermatch_api.services.ingestion import ingest, load_fields
+from papermatch_api.services.math_content import load_math_cards
 
 
 def seed(limit: int) -> int:
@@ -26,13 +27,22 @@ def seed(limit: int) -> int:
             query=PaperQuery(limit=min(limit, 100)),
             max_records=limit,
         )
+        # After the papers: a maths card names its paper by canonical id.
+        math = load_math_cards(session, settings.fixtures_dir)
     print(
         f"fields: {field_count}\n"
         f"papers inserted: {report.inserted}\n"
         f"papers updated: {report.updated}\n"
         f"duplicates merged: {report.merged_duplicates}\n"
-        f"skipped (licence unknown): {report.skipped_unlicensed}"
+        f"skipped (licence unknown): {report.skipped_unlicensed}\n"
+        f"maths cards: {math.cards} "
+        f"({math.equations} equations, {math.symbols} symbols, {math.steps} steps; "
+        f"{math.unverified_steps} step(s) unverified and hidden by default)"
     )
+    if math.rejected_equations:
+        print(f"formulas refused by the LaTeX check: {', '.join(math.rejected_equations)}")
+    if math.missing_papers:
+        print(f"maths cards with no matching paper: {', '.join(math.missing_papers)}")
     return 0
 
 

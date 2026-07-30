@@ -1,0 +1,391 @@
+{
+  "$meta": {
+    "note": "Hand-authored maths cards (spec Phase 4: 手動作成した検証済み数式カード). Written for this repository, CC0-1.0. NOT generated — `scripts/generate-fixtures.mjs` does not touch this file.",
+    "provenance": "The papers these attach to are synthetic (see papers.sample.json), but the MATHEMATICS is standard and correct: these are textbook identities, not invented results. That is deliberate — a fixture that claims to be 'verified' has to contain statements that can actually be verified.",
+    "verification": "Every `numericCheck` and `dimensionCheck` below is run by papermatch_api.mathcheck at ingestion time, and the resulting verificationStatus is WHATEVER THE CHECK RETURNS. The statuses are not written here. A step with no check declared is stored as `unverified` and is hidden by default (spec section 12) — the last card exists specifically to exercise that path.",
+    "prose": "All explanatory prose in `body` and `rationale` was written by an AI (see DECISIONS.md D-022 for why that is stated rather than glossed) and is stored with provenanceKind `ai_explanation`. Nothing here is `human_reviewed`; no human has reviewed it.",
+    "license": "CC0-1.0"
+  },
+
+  "cards": [
+    {
+      "key": "gaussian-integral",
+      "paperCanonicalId": "doi:10.4171/pm.2019.0004",
+      "cardType": "derivation",
+      "title": "ガウス積分を極座標で解く",
+      "level": "level_2",
+      "body": {
+        "summary": "1次元では原始関数が書けない積分が、2乗して2次元にすると極座標で初等的に解けます。「解けない積分を、解ける積分に埋め込む」という発想そのものが道具です。",
+        "whyItMatters": "この積分は正規分布の規格化定数であり、経路積分の出発点でもあります。分野をまたいで最も繰り返し現れる計算のひとつです。"
+      },
+      "equations": [
+        {
+          "key": "gauss-I",
+          "latex": "I(a) = \\int_{-\\infty}^{\\infty} e^{-a x^{2}}\\,dx",
+          "equationNumber": "1",
+          "section": "Appendix A",
+          "symbols": [
+            {
+              "symbol": "a",
+              "localMeaning": "ガウシアンの幅を決める正の定数。大きいほど鋭いピークになります。",
+              "generalMeaning": "指数の2次係数",
+              "unit": "1/L^2",
+              "scope": "equation"
+            },
+            {
+              "symbol": "x",
+              "localMeaning": "積分変数。実軸全体を走ります。",
+              "generalMeaning": "実変数",
+              "unit": "L",
+              "scope": "equation"
+            }
+          ]
+        },
+        {
+          "key": "gauss-I2",
+          "latex": "I(a)^{2} = \\int_{-\\infty}^{\\infty}\\!\\!\\int_{-\\infty}^{\\infty} e^{-a (x^{2}+y^{2})}\\,dx\\,dy",
+          "equationNumber": "2",
+          "section": "Appendix A",
+          "symbols": [
+            {
+              "symbol": "y",
+              "localMeaning": "2つ目の積分変数。x と同じ積分をもう一度書いたもので、新しい仮定ではありません。",
+              "generalMeaning": "実変数",
+              "unit": "L",
+              "scope": "equation"
+            }
+          ]
+        },
+        {
+          "key": "gauss-polar",
+          "latex": "I(a)^{2} = \\int_{0}^{2\\pi}\\!\\!\\int_{0}^{\\infty} e^{-a r^{2}}\\, r\\,dr\\,d\\theta",
+          "equationNumber": "3",
+          "section": "Appendix A",
+          "symbols": [
+            {
+              "symbol": "r",
+              "localMeaning": "原点からの距離。被積分関数が r だけの関数になるのがこの変換の要点です。",
+              "generalMeaning": "極座標の動径",
+              "unit": "L",
+              "scope": "equation"
+            },
+            {
+              "symbol": "\\theta",
+              "localMeaning": "方位角。被積分関数に現れないので、積分すると 2π が出るだけです。",
+              "generalMeaning": "極座標の角度",
+              "unit": null,
+              "scope": "equation"
+            }
+          ]
+        },
+        {
+          "key": "gauss-result",
+          "latex": "I(a) = \\sqrt{\\frac{\\pi}{a}}",
+          "equationNumber": "4",
+          "section": "Appendix A",
+          "symbols": []
+        }
+      ],
+      "steps": [
+        {
+          "from": "gauss-I",
+          "to": "gauss-I2",
+          "latex": "I(a)^{2} = \\left(\\int e^{-a x^{2}}dx\\right)\\left(\\int e^{-a y^{2}}dy\\right)",
+          "operation": "同じ積分を2つ掛け、積分変数の名前を変える",
+          "rationale": "積分変数の名前は積分の値に関係しないので、2つ目を y と呼び直せます。ここまでで新しい仮定は入っていません。",
+          "numericCheck": {
+            "$note": "The content of this step is that the two-dimensional Gaussian factorises into two one-dimensional ones. That is a pointwise identity, so it can be sampled directly rather than through a stand-in.",
+            "lhs": "exp(-a * (x*x + y*y))",
+            "rhs": "exp(-a * x*x) * exp(-a * y*y)",
+            "variables": { "a": [0.2, 6.0], "x": [-3.0, 3.0], "y": [-3.0, 3.0] }
+          },
+          "dimensionCheck": {
+            "lhs": { "L": 2 },
+            "rhs": { "L": 2 }
+          }
+        },
+        {
+          "from": "gauss-I2",
+          "to": "gauss-polar",
+          "latex": "dx\\,dy = r\\,dr\\,d\\theta, \\qquad x^{2}+y^{2} = r^{2}",
+          "operation": "極座標へ変数変換する",
+          "rationale": "ヤコビアンが r なので面積要素に r が付きます。この r こそが、1次元では書けなかった原始関数を書けるようにする因子です。",
+          "numericCheck": {
+            "$note": "Substituting x = r cos(theta), y = r sin(theta) into the integrand must leave it a function of r alone. Sampled over r and theta, this is the substitution itself rather than a consequence of it.",
+            "lhs": "exp(-a * ((r*cos(t))*(r*cos(t)) + (r*sin(t))*(r*sin(t))))",
+            "rhs": "exp(-a * r*r)",
+            "variables": { "a": [0.2, 6.0], "r": [0.1, 4.0], "t": [0.0, 6.28] }
+          },
+          "dimensionCheck": {
+            "lhs": { "L": 2 },
+            "rhs": { "L": 2 }
+          }
+        },
+        {
+          "from": "gauss-polar",
+          "to": "gauss-result",
+          "latex": "\\int_{0}^{\\infty} r e^{-a r^{2}} dr = \\frac{1}{2a} \\;\\Longrightarrow\\; I(a)^{2} = \\frac{\\pi}{a}",
+          "operation": "動径積分を実行し、平方根をとる",
+          "rationale": "u = r^2 と置けば初等的に積分できます。I(a) は正の値の積分なので、平方根では正の枝をとります。",
+          "numericCheck": {
+            "$note": "Checked as a derivative: the claimed antiderivative -e^{-ar^2}/(2a), differenced over a small h, must reproduce the integrand r e^{-ar^2}. The tolerance is loosened to the truncation error of the difference.",
+            "lhs": "(((0 - exp(-a*(r+h)*(r+h))/(2*a)) - (0 - exp(-a*r*r)/(2*a))) / h)",
+            "rhs": "r * exp(-a * r*r)",
+            "variables": { "a": [0.2, 4.0], "r": [0.2, 2.5], "h": [1e-7, 5e-7] },
+            "tolerance": 1e-05
+          },
+          "dimensionCheck": {
+            "lhs": { "L": 1 },
+            "rhs": { "L": 1 }
+          }
+        }
+      ]
+    },
+
+    {
+      "key": "relativistic-limit",
+      "paperCanonicalId": "doi:10.1103/pm.2026.0024",
+      "cardType": "consistency_check",
+      "title": "相対論的エネルギーの非相対論的極限",
+      "level": "level_2",
+      "body": {
+        "summary": "相対論的なエネルギーを小さい運動量で展開すると、静止エネルギーと古典的な運動エネルギーに分かれます。新しい理論が古い理論を含んでいることの、最も短い確認です。",
+        "whyItMatters": "仕様書10節の CONSISTENCY CHECK はこの種の確認です。式が正しいかどうかではなく、既に正しいと分かっているものと矛盾しないかを見ています。"
+      },
+      "equations": [
+        {
+          "key": "rel-E",
+          "latex": "E = \\sqrt{p^{2}c^{2} + m^{2}c^{4}}",
+          "equationNumber": "12",
+          "section": "2",
+          "symbols": [
+            {
+              "symbol": "p",
+              "localMeaning": "運動量の大きさ。",
+              "generalMeaning": "運動量",
+              "unit": "M L / T",
+              "scope": "paper"
+            },
+            {
+              "symbol": "m",
+              "localMeaning": "静止質量。",
+              "generalMeaning": "質量",
+              "unit": "M",
+              "scope": "paper"
+            },
+            {
+              "symbol": "c",
+              "localMeaning": "光速。この論文では自然単位を使わず、明示的に残しています。",
+              "generalMeaning": "光速",
+              "unit": "L / T",
+              "scope": "field"
+            }
+          ]
+        },
+        {
+          "key": "rel-expanded",
+          "latex": "E \\simeq mc^{2} + \\frac{p^{2}}{2m} \\qquad (p \\ll mc)",
+          "equationNumber": "13",
+          "section": "2",
+          "symbols": []
+        }
+      ],
+      "steps": [
+        {
+          "from": "rel-E",
+          "to": "rel-expanded",
+          "latex": "E = mc^{2}\\sqrt{1 + \\left(\\frac{p}{mc}\\right)^{2}} \\simeq mc^{2}\\left(1 + \\frac{1}{2}\\left(\\frac{p}{mc}\\right)^{2}\\right)",
+          "operation": "p/(mc) について1次まで展開する",
+          "rationale": "(1+u)^{1/2} ≈ 1 + u/2 を u = (p/mc)^2 に使っています。u が小さいことが前提で、これが (p ≪ mc) と書いてある条件です。",
+          "numericCheck": {
+            "lhs": "sqrt(p*p*c*c + m*m*c*c*c*c)",
+            "rhs": "m*c*c + p*p/(2*m)",
+            "variables": {
+              "p": [0.0001, 0.001],
+              "m": [1.0, 2.0],
+              "c": [1.0, 1.0]
+            },
+            "tolerance": 1e-06
+          },
+          "dimensionCheck": {
+            "lhs": { "M": 1, "L": 2, "T": -2 },
+            "rhs": { "M": 1, "L": 2, "T": -2 }
+          }
+        }
+      ]
+    },
+
+    {
+      "key": "entanglement-entropy",
+      "paperCanonicalId": "doi:10.1103/pm.2025.0014",
+      "cardType": "definition",
+      "title": "フォン・ノイマン エントロピー",
+      "level": "level_1",
+      "body": {
+        "summary": "部分系の密度行列から計算される量で、その部分系が残りとどれだけ絡み合っているかを測ります。純粋状態の全体系でも、部分系だけを見ると 0 にならないところが要点です。",
+        "whyItMatters": "「情報がどこにあるか」を数値にする定義で、量子情報・物性・重力のどの文脈でも同じ式が現れます。"
+      },
+      "equations": [
+        {
+          "key": "vn-entropy",
+          "latex": "S(\\rho) = -\\operatorname{Tr}\\left(\\rho \\log \\rho\\right)",
+          "equationNumber": "5",
+          "section": "1",
+          "symbols": [
+            {
+              "symbol": "\\rho",
+              "localMeaning": "着目する部分系の縮約密度行列。全体の状態から、見ない自由度をトレースアウトしたもの。",
+              "generalMeaning": "密度行列",
+              "unit": null,
+              "scope": "paper"
+            },
+            {
+              "symbol": "S",
+              "localMeaning": "エントロピー。この論文では自然対数を使うので単位は nat です。",
+              "generalMeaning": "フォン・ノイマン エントロピー",
+              "unit": null,
+              "scope": "paper"
+            }
+          ]
+        },
+        {
+          "key": "vn-diagonal",
+          "latex": "S(\\rho) = -\\sum_{i} \\lambda_{i} \\log \\lambda_{i}",
+          "equationNumber": "6",
+          "section": "1",
+          "symbols": [
+            {
+              "symbol": "\\lambda_i",
+              "localMeaning": "密度行列の固有値。和は 1 で、それぞれ 0 以上です。",
+              "generalMeaning": "固有値",
+              "unit": null,
+              "scope": "equation"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "from": "vn-entropy",
+          "to": "vn-diagonal",
+          "latex": "\\rho = \\sum_i \\lambda_i |i\\rangle\\langle i| \\;\\Longrightarrow\\; \\operatorname{Tr}(\\rho\\log\\rho) = \\sum_i \\lambda_i \\log \\lambda_i",
+          "operation": "密度行列を対角化する",
+          "rationale": "密度行列はエルミートなので対角化でき、トレースは基底に依らないので固有値の和として書けます。",
+          "$note": "No numeric check. What this step actually claims — that the trace does not depend on the basis — is a linear-algebra fact, and sampling an expression cannot establish it. A numeric identity written here would be a restatement of the right-hand side and would earn `mechanically_verified` without checking anything.",
+          "dimensionCheck": {
+            "lhs": {},
+            "rhs": {}
+          }
+        }
+      ]
+    },
+
+    {
+      "key": "hall-conductance",
+      "paperCanonicalId": "doi:10.1103/pm.2024.0001",
+      "cardType": "physical_meaning",
+      "title": "チャーン数が電気伝導度になるということ",
+      "level": "level_3",
+      "body": {
+        "summary": "整数量子ホール効果のホール伝導度は、バンドのチャーン数という整数に基本定数を掛けたものになります。測定量が整数で決まるので、不純物や試料の形にほとんど依らないという強い帰結が出ます。",
+        "whyItMatters": "「トポロジカル」であることが、なぜ測定精度の話につながるのかがここに集約されています。整数は連続的に変化できないので、少々の摂動では動きません。"
+      },
+      "equations": [
+        {
+          "key": "hall-sigma",
+          "latex": "\\sigma_{xy} = \\frac{e^{2}}{h} \\, C",
+          "equationNumber": "1",
+          "section": "1",
+          "symbols": [
+            {
+              "symbol": "\\sigma_{xy}",
+              "localMeaning": "ホール伝導度。電場と垂直に流れる電流の比例係数。",
+              "generalMeaning": "非対角伝導度",
+              "unit": "I^2 T^3 / (M L^2)",
+              "scope": "paper"
+            },
+            {
+              "symbol": "C",
+              "localMeaning": "占有バンドのチャーン数。定義から整数です。",
+              "generalMeaning": "第一チャーン数",
+              "unit": null,
+              "scope": "paper"
+            },
+            {
+              "symbol": "e",
+              "localMeaning": "電気素量。",
+              "generalMeaning": "電気素量",
+              "unit": "I T",
+              "scope": "field"
+            },
+            {
+              "symbol": "h",
+              "localMeaning": "プランク定数。",
+              "generalMeaning": "プランク定数",
+              "unit": "M L^2 / T",
+              "scope": "field"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "from": "hall-sigma",
+          "to": "hall-sigma",
+          "latex": "[\\sigma_{xy}] = \\frac{[e]^{2}}{[h]} = \\frac{(\\mathrm{I}\\,\\mathrm{T})^{2}}{\\mathrm{M}\\,\\mathrm{L}^{2}\\,\\mathrm{T}^{-1}}",
+          "operation": "両辺の次元を確認する",
+          "rationale": "C は無次元なので、伝導度の次元は e^2/h だけで決まります。この比がコンダクタンスの量子です。",
+          "dimensionCheck": {
+            "lhs": { "I": 2, "T": 3, "M": -1, "L": -2 },
+            "rhs": { "I": 2, "T": 3, "M": -1, "L": -2 }
+          }
+        }
+      ]
+    },
+
+    {
+      "key": "unverified-example",
+      "paperCanonicalId": "doi:10.1103/pm.2022.0013",
+      "cardType": "approximation",
+      "title": "強結合領域への外挿（未検証）",
+      "level": "level_4",
+      "body": {
+        "summary": "このカードは、検証を通っていない変形が既定で隠れることを確かめるために置いてあります。主張自体に根拠はありません。",
+        "whyItMatters": "仕様書12節は「未検証の変形は既定で非表示」と定めています。その分岐が実際に通ることを、コーパスの中で示すためのものです。"
+      },
+      "equations": [
+        {
+          "key": "weak-coupling",
+          "latex": "\\Delta(\\lambda) = \\Delta_{0}\\left(1 + \\alpha \\lambda + O(\\lambda^{2})\\right)",
+          "equationNumber": "20",
+          "section": "4",
+          "symbols": [
+            {
+              "symbol": "\\lambda",
+              "localMeaning": "結合定数。",
+              "generalMeaning": "結合定数",
+              "unit": null,
+              "scope": "paper"
+            }
+          ]
+        },
+        {
+          "key": "strong-coupling",
+          "latex": "\\Delta(\\lambda) \\approx \\Delta_{0}\\, e^{\\alpha \\lambda}",
+          "equationNumber": "21",
+          "section": "4",
+          "symbols": []
+        }
+      ],
+      "steps": [
+        {
+          "from": "weak-coupling",
+          "to": "strong-coupling",
+          "latex": "1 + \\alpha\\lambda + O(\\lambda^{2}) \\;\\to\\; e^{\\alpha\\lambda}",
+          "operation": "1次の展開を指数関数へ再和する",
+          "rationale": "低次の展開が指数関数の展開に見えるという理由だけで、大きい λ まで指数形が正しいとは言えません。この再和は検証を宣言しておらず、既定では表示されません。"
+        }
+      ]
+    }
+  ]
+}

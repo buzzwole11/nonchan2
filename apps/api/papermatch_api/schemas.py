@@ -511,3 +511,95 @@ class ErrorResponse(CamelModel):
 def error_response(code: str, message: str, **details: Any) -> dict[str, Any]:
     body = ErrorResponse(error=ErrorBody(code=code, message=message, details=details or None))
     return body.model_dump(by_alias=True, exclude_none=True)
+
+
+# ------------------------------------------------------------------------- equations
+
+
+class EquationSymbolOut(CamelModel):
+    """Spec section 10, 記号タップ: この論文での意味 / 一般的な意味 / 単位 / 適用スコープ."""
+
+    symbol: str
+    local_meaning: str
+    general_meaning: str | None
+    unit: str | None
+    scope: str
+    provenance_kind: str
+
+
+class EquationOut(CamelModel):
+    """Spec section 11: LaTeX is the record. There is no image field, by design.
+
+    ``renderable`` is the server's verdict on whether this string may be handed to the
+    WebView renderer. When it is false the client falls back to showing ``latex`` as
+    source with a link to the paper, which is what section 11 prescribes — so the string
+    travels either way, and the decision is not left to the client (section 25).
+    """
+
+    id: uuid.UUID
+    paper_id: uuid.UUID
+    latex: str
+    equation_number: str | None
+    section: str | None
+    display: bool
+    provenance_kind: str
+    verification_status: str
+    renderable: bool
+    refusal_reasons: list[str]
+    symbols: list[EquationSymbolOut]
+
+
+class DerivationStepOut(CamelModel):
+    """One transformation, with what is known about it attached.
+
+    ``verificationStatus`` is not decoration: section 12 hides anything unverified by
+    default, and ``evidence`` records which check produced the status so a reader can see
+    what was actually done rather than trusting the word.
+    """
+
+    id: uuid.UUID
+    from_equation_id: uuid.UUID
+    to_equation_id: uuid.UUID
+    latex: str
+    operation: str
+    rationale: str
+    verification_status: str
+    provenance_kind: str
+    renderable: bool
+    evidence: dict[str, Any] | None
+
+
+class MathCardOut(CamelModel):
+    card_type: str
+    title: str
+    level: str
+    review_status: str
+    provenance_kind: str
+    body: dict[str, Any]
+    id: uuid.UUID
+
+
+class MathCardDetailResponse(CamelModel):
+    """Everything Focus Mode needs in one round trip (spec section 10).
+
+    The tabs 記号 / 構造 / 導出 / 意味 are views onto the same fetched card, not separate
+    requests: a tab that is empty for a beat after the tap undercuts the one thing this
+    screen is for.
+    """
+
+    card: MathCardOut
+    equations: list[EquationOut]
+    steps: list[DerivationStepOut]
+    #: Steps withheld because no check passed (spec section 12). Reported as a count so
+    #: the UI can say that something exists rather than pretending the derivation is
+    #: complete.
+    hidden_step_count: int
+
+
+class MathCardListResponse(CamelModel):
+    cards: list[MathCardOut]
+    total: int
+
+
+class EquationListResponse(CamelModel):
+    equations: list[EquationOut]

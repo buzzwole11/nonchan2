@@ -129,14 +129,29 @@ AI が要る項目は環境制約で未着手です（DECISIONS.md D-024）。
 
 ## Phase 4 — 数式
 
-- [ ] KaTeX / MathJax の WebView レンダラとフォールバック
-- [ ] `Equation` / `EquationSymbol` の投入経路
-- [ ] 人手で作成した検証済み数式カード
-- [ ] Focus Mode（記号 / 構造 / 導出 / 意味 / 極限）
-- [ ] 詳細度スライダーと Why? ボタン
-- [ ] 理解チェック
+### 4-A サーバ側の土台 ✅
+- [x] **危険な LaTeX の判定**（`text/latex_safety.py`）— サニタイズではなく可否判定。
+      仕様書 11 節「原式を勝手に変換しない」に従い、拒否した式もソースとして返す（DECISIONS.md D-027）
+- [x] **機械的検証**（`mathcheck/`）— 数値代入と次元解析。式言語は AST で検証した算術のみ
+- [x] **手動作成の数式カード** 5 枚（`fixtures/math-cards.json`）— 検証状態は fixture に書かず、
+      取り込み時にチェックを走らせた結果を保存（DECISIONS.md D-028）
+- [x] `Equation` / `EquationSymbol` / `DerivationStep` の投入経路（`services/math_content.py`）
+- [x] **未検証の変形を既定で非表示**（仕様書 12 節）— 隠した件数は返すので、
+      導出が完全であるかのように見えることはない
+- [x] API — `GET /papers/{id}/equations`、`GET /math-cards`、`GET /math-cards/{id}`
+
+### 4-B レンダリング
+- [ ] KaTeX を WebView に同梱（CDN 不可 — 仕様書 25 節とネットワークポリシー）
+- [ ] MathJax へのフォールバックと、失敗時の LaTeX ソース表示
 - [ ] MathML 併記とスクリーンリーダー用説明
-- [ ] 危険な LaTeX 入力のサニタイズテスト
+- [ ] インライン / ディスプレイ、横スクロール、タップで全画面、LaTeX コピー
+
+### 4-C Focus Mode
+- [ ] 記号 / 構造 / 導出 / 意味 / 極限 のタブ
+- [ ] 導出の Step 表示と、矢印タップで中間式
+- [ ] 詳細度スライダーと Why? ボタン
+- [ ] 記号タップ（この論文での意味 / 一般的な意味 / 単位 / 適用スコープ）
+- [ ] 理解チェック（点数化はしない）
 
 ---
 
@@ -200,4 +215,5 @@ AI が要る項目は環境制約で未着手です（DECISIONS.md D-024）。
 | pgvector 列 | Phase 3（DECISIONS.md D-006） |
 | レート制限 | Provider 側は実装済み（`providers/http.py`）。API 側の呼び出し元制限は未実装 |
 | 観測性 | 構造化ログ・トレース・Provider レイテンシ指標は未実装 |
+| 数式の LaTeX 解析 | チェックは著者が並記した機械可読形に対して行う。LaTeX 本体との食い違いは検出できない（D-028） |
 | AI 説明・実翻訳 | 環境がネットワークを遮断（DECISIONS.md D-024）。interface は Phase 0 から存在 |

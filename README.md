@@ -4,7 +4,7 @@
 
 完全な企画・技術仕様は [`PaperMatch_SPEC.md`](./PaperMatch_SPEC.md) にあります。この README は、いま何が動くのか、どう動かすのかだけを書いています。
 
-**現在の状態: Phase 0 完了 / Phase 1 は 1-A〜1-D 完了（実 API への疎通と E2E は残）/ Phase 2 は AI 非依存部分が完了。** 実装フェーズの全体像は [`TASKS.md`](./TASKS.md)、設計上の判断とその理由は [`DECISIONS.md`](./DECISIONS.md)、構成の説明は [`ARCHITECTURE.md`](./ARCHITECTURE.md) を参照してください。
+**現在の状態: Phase 0 完了 / Phase 1 は 1-A〜1-D 完了（実 API への疎通と E2E は残）/ Phase 2 は AI 非依存部分が完了 / Phase 4 はサーバ側 (4-A) 完了。** 実装フェーズの全体像は [`TASKS.md`](./TASKS.md)、設計上の判断とその理由は [`DECISIONS.md`](./DECISIONS.md)、構成の説明は [`ARCHITECTURE.md`](./ARCHITECTURE.md) を参照してください。
 
 ---
 
@@ -35,6 +35,19 @@
 - **Abstract の構造分類** — Background / Problem / Method / Result / Significance を規則ベースで判定し、`heuristic` として保存します（`ai` とは名乗りません — DECISIONS.md D-022）。fixture の正解ラベルに対する一致率をテストで測定しています。
 - **個人用学術英語辞典** — 翻訳シートから表現を保存。単語 / 連語 / 構文 / 一文 を自動判定し、出典の文をそのまま文脈として残します。
 - **Learn タブと復習** — 数日後に 1 件ずつ再提示。答えは「わかった / もう一度」の 2 択のみで、点数も連続記録もありません（DECISIONS.md D-023）。
+
+## Phase 4 で追加されたもの（数式・サーバ側）
+
+- **危険な LaTeX の判定** — 数式は WebView 内の KaTeX に渡るので、式文字列はレンダリングエンジンに届く未検証入力です。`\href{javascript:...}` によるスクリプト実行、`\def` の展開爆弾、`\rule{1pt}{99999em}` のレイアウト爆弾などを拒否します。**サニタイズはしません** — 一部を削った式は「論文の式に見えるが論文の式ではないもの」で、仕様書 11 節の「原式を勝手に変換しない」に反します。拒否された式もソースとして返り、クライアントはそれを表示します（[`DECISIONS.md`](./DECISIONS.md) D-027）。
+- **機械的検証** — 数値代入と次元解析。式の評価言語は AST で検証した算術のみで、`__import__` も属性アクセスも通りません。
+- **手動作成の数式カード 5 枚** — 導出 / 定義 / 物理的意味 / 整合性チェック / 近似。**検証状態は fixture に書きません。** チェックそのものを書き、取り込み時に実際に走らせた結果を保存します（[`DECISIONS.md`](./DECISIONS.md) D-028）。
+- **未検証の変形は既定で非表示**（仕様書 12 節）。ただし隠した件数は返すので、導出が完全であるかのようには見えません。
+
+```bash
+curl -s localhost:8000/math-cards | jq '.cards[] | {cardType, title}'
+curl -s localhost:8000/math-cards/$ID | jq '.steps[] | {verificationStatus, operation}'
+curl -s "localhost:8000/math-cards/$ID?includeUnverified=true" | jq '.hiddenStepCount'
+```
 
 ## 実データ Provider（arXiv / OpenAlex）
 
@@ -70,7 +83,7 @@ Markdown と手で整えた JSON は Prettier の対象外です（`.prettierign
 
 ### まだ無いもの
 
-取り込み worker（定期実行、撤回・版更新の同期）と実 API への疎通確認（上記 `-m live`、この環境では実行不可 — [`DECISIONS.md`](./DECISIONS.md) D-016）、実翻訳 Provider と AI 説明（同じくネットワーク制約 — D-024）、Maestro による E2E、数式カード、Knowledge Canvas。着手順は [`TASKS.md`](./TASKS.md) にあります。
+数式の描画（Phase 4-B: KaTeX の WebView 同梱、MathML 併記）と Focus Mode（4-C）、取り込み worker（定期実行、撤回・版更新の同期）と実 API への疎通確認（上記 `-m live`、この環境では実行不可 — [`DECISIONS.md`](./DECISIONS.md) D-016）、実翻訳 Provider と AI 説明（同じくネットワーク制約 — D-024）、Maestro による E2E、Knowledge Canvas。着手順は [`TASKS.md`](./TASKS.md) にあります。
 
 ---
 
@@ -133,7 +146,7 @@ make format      # 両言語の自動整形
 
 DB が無い環境では統合テストと E2E テストは失敗ではなく **skip** され、起動方法が理由に表示されます。
 
-現在: Python 331 件 / TypeScript 89 件。
+現在: Python 449 件 / TypeScript 89 件。
 
 | 種別 | 対象 |
 | --- | --- |
@@ -152,7 +165,7 @@ apps/
 packages/
   design-tokens/      仕様書 19 節の配色・書体・余白・モーション
   shared-types/       ドメイン型、API 契約、言語横断の語彙（enums.json）
-fixtures/             分野タクソノミと合成サンプルコーパス
+fixtures/             分野タクソノミ、合成サンプルコーパス、手動作成の数式カード
 scripts/              fixture ジェネレータ
 infra/                コンテナ初期化 SQL
 ```
