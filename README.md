@@ -125,6 +125,26 @@ make mobile   # Expo dev server
 
 モバイルアプリの接続先は `apps/mobile/app.json` の `expo.extra.apiBaseUrl` です。実機から繋ぐ場合は開発マシンの LAN IP に変更してください。
 
+### make が無い環境（Windows など）
+
+`make` の各ターゲットは npm script からも叩けます。
+
+```bash
+npm install                                                        # make setup の前半
+cd apps/api && uv venv --python 3.11 && uv pip install -e ".[dev]" # 後半
+npm run db:up                                                      # make db-up
+npm run db:migrate                                                 # make migrate
+npm run api:dev                                                    # make api
+npm run mobile                                                     # make mobile
+npm run mobile:clear                                               # 同上 + Metro のキャッシュを消す
+```
+
+**`expo start` をリポジトリのルートで実行しないでください。** ルートの `package.json` には `main` が無いため、Expo が `expo-router/entry` ではなく既定の `expo/AppEntry.js` を入口だと判断し、この構成には存在しない `App.js` を探して `Unable to resolve module ../../App` で失敗します。`npm run mobile` はワークスペース経由で `apps/mobile` の中から起動するので、この取り違えが起きません。
+
+### 数式レンダラだけを確認する
+
+`/dev/math` は API もデータベースも使いません（ハードコードした LaTeX を `MathView` に流すだけ）。`npm run mobile` だけで起動でき、API に繋がらないときの入口画面に出る「開発用: 数式レンダラの確認」から入れます。このリンクは `__DEV__` の中にあるので製品ビルドには出ません。
+
 ### 動作確認
 
 ```bash

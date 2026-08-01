@@ -23,7 +23,9 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "katex:build": "node scripts/build-katex-runtime.mjs"
+    "katex:build": "node scripts/build-katex-runtime.mjs",
+    "mobile": "npm run start --workspace @papermatch/mobile",
+    "mobile:clear": "npm run start:clear --workspace @papermatch/mobile"
   },
   "devDependencies": {
     "eslint": "^9.39.5",
