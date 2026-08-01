@@ -138,13 +138,18 @@ export function deckReducer(state: DeckState, event: DeckEvent): DeckState {
       return { ...state, pendingUndo: null };
 
     case 'impression_recorded': {
-      if (state.unsentImpressions.some((i) => i.paperId === event.paperId)) {
+      const existing = state.unsentImpressions.find((i) => i.paperId === event.paperId);
+      if (existing !== undefined) {
+        // Re-recording the same card can only ever raise its dwell time. When it does not,
+        // return the state that came in rather than an equal copy of it: a reducer that
+        // hands back a new object for an action that changed nothing turns any effect
+        // watching the state into a render loop, which is exactly what happened here.
+        const dwell = Math.max(existing.dwellMs ?? 0, event.dwellMs ?? 0);
+        if (dwell === (existing.dwellMs ?? 0)) return state;
         return {
           ...state,
           unsentImpressions: state.unsentImpressions.map((i) =>
-            i.paperId === event.paperId
-              ? { ...i, dwellMs: Math.max(i.dwellMs ?? 0, event.dwellMs ?? 0) }
-              : i,
+            i.paperId === event.paperId ? { ...i, dwellMs: dwell } : i,
           ),
         };
       }

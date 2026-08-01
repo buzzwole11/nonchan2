@@ -53,6 +53,7 @@ export default function DiscoverScreen() {
     translate(locale, key, params);
 
   const current = deck.current;
+  const { noteImpression } = deck;
 
   const selection = selectionFor(selectionState, current?.paper.id ?? null);
 
@@ -60,8 +61,11 @@ export default function DiscoverScreen() {
   useEffect(() => {
     if (current === null) return;
     shownAtRef.current = Date.now();
-    deck.noteImpression(current.paper.id, current.position);
-  }, [current, deck]);
+    noteImpression(current.paper.id, current.position);
+    // Depends on the recorder, not the whole controller: what this effect needs is the
+    // card and a way to record it, and listing the controller made it re-run on state it
+    // does not care about — which, since the body of the effect dispatches, was a loop.
+  }, [current, noteImpression]);
 
   const openSource = useCallback(async () => {
     if (current === null) return;

@@ -173,6 +173,42 @@ describe('impressions', () => {
     expect(state.unsentImpressions[0]?.dwellMs).toBe(9000);
   });
 
+  it('returns the same state when re-recording changes nothing', () => {
+    // Not a micro-optimisation. The Discover screen records an impression from an effect,
+    // so a reducer that hands back an equal-but-new object for a no-op makes that effect
+    // re-run, dispatch, and re-run again — which is the render loop this guards against.
+    const before = deckReducer(loaded(['a']), {
+      type: 'impression_recorded',
+      paperId: 'a',
+      position: 0,
+      dwellMs: 500,
+    });
+    const after = deckReducer(before, {
+      type: 'impression_recorded',
+      paperId: 'a',
+      position: 0,
+      dwellMs: null,
+    });
+    expect(after).toBe(before);
+  });
+
+  it('still returns a new state when the dwell actually grows', () => {
+    const before = deckReducer(loaded(['a']), {
+      type: 'impression_recorded',
+      paperId: 'a',
+      position: 0,
+      dwellMs: 500,
+    });
+    const after = deckReducer(before, {
+      type: 'impression_recorded',
+      paperId: 'a',
+      position: 0,
+      dwellMs: 4000,
+    });
+    expect(after).not.toBe(before);
+    expect(after.unsentImpressions[0]?.dwellMs).toBe(4000);
+  });
+
   it('retains impressions that were not flushed, so a shown card cannot return', () => {
     let state = loaded(['a', 'b']);
     for (const paperId of ['a', 'b']) {

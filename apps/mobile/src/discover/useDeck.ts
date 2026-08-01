@@ -5,7 +5,7 @@
  * `deck.test.ts` cover the awkward cases (undo before the server confirms, a failed page
  * with cards still in hand) without a network.
  */
-import { useCallback, useEffect, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 
 import type { FeedItem, SaveReason } from '@papermatch/shared-types';
 
@@ -169,14 +169,20 @@ export function useDeck(): DeckController {
     void loadPage(null, { allowCache: true });
   }, [loadPage]);
 
-  return {
-    state,
-    current: currentCard(state),
-    next: nextCard(state),
-    act,
-    undo,
-    dismissUndo,
-    noteImpression,
-    reload,
-  };
+  // Memoised, because a screen that lists this object in an effect's dependencies would
+  // otherwise re-run that effect on every render — and the effect on the Discover screen
+  // records an impression, so it dispatched, re-rendered, and dispatched again.
+  return useMemo(
+    () => ({
+      state,
+      current: currentCard(state),
+      next: nextCard(state),
+      act,
+      undo,
+      dismissUndo,
+      noteImpression,
+      reload,
+    }),
+    [state, act, undo, dismissUndo, noteImpression, reload],
+  );
 }
