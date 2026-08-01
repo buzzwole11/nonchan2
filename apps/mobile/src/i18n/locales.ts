@@ -186,6 +186,11 @@ export const messages = {
     'paperType.classic': '古典的',
     'paperType.recent': '最近',
 
+    // The tags offered after a save. The prompt is a statement, not a question: the paper
+    // is already saved and answering is optional (spec section 9).
+    'save.whyLabel': '保存した理由（任意）',
+    'save.tagOn': '選択中',
+    'save.tagFailed': 'タグを付けられませんでした',
     'saveReason.interesting': '気になる',
     'saveReason.read_later': 'あとで読む',
     'saveReason.english_expression': '英語表現',
@@ -468,6 +473,9 @@ export const messages = {
     'paperType.published': 'Published',
     'paperType.classic': 'Classic',
     'paperType.recent': 'Recent',
+    'save.whyLabel': 'Why you saved it (optional)',
+    'save.tagOn': 'selected',
+    'save.tagFailed': 'Could not add that tag',
     'saveReason.interesting': 'Interesting',
     'saveReason.read_later': 'Read later',
     'saveReason.english_expression': 'English',

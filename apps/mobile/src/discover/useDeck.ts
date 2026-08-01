@@ -31,6 +31,8 @@ export interface DeckController {
   next: FeedItem | null;
   /** Left or right; returns once the action has been sent (or has failed offline). */
   act: (direction: SwipeDirection, reasons?: SaveReason[]) => Promise<void>;
+  /** Replace the tags on an already-saved paper (spec section 9: 任意タグ). */
+  setSaveReasons: (paperId: string, reasons: SaveReason[]) => Promise<boolean>;
   undo: () => Promise<void>;
   dismissUndo: () => void;
   /** Called when a card becomes visible, and again with dwell when it leaves. */
@@ -153,6 +155,20 @@ export function useDeck(): DeckController {
     [api],
   );
 
+  const setSaveReasons = useCallback(
+    async (paperId: string, reasons: SaveReason[]) => {
+      try {
+        await api.updateSaved(paperId, { reasons });
+        return true;
+      } catch {
+        // The paper stays saved with whatever it had; only the tag failed to stick. The
+        // caller says so rather than leaving a chip looking selected when it is not.
+        return false;
+      }
+    },
+    [api],
+  );
+
   const undo = useCallback(async () => {
     const pending = stateRef.current.pendingUndo;
     if (pending === null || pending.actionId === null) return;
@@ -207,12 +223,13 @@ export function useDeck(): DeckController {
       current: currentCard(state),
       next: nextCard(state),
       act,
+      setSaveReasons,
       undo,
       dismissUndo,
       noteImpression,
       reload,
       sendFeedback,
     }),
-    [state, act, undo, dismissUndo, noteImpression, reload, sendFeedback],
+    [state, act, setSaveReasons, undo, dismissUndo, noteImpression, reload, sendFeedback],
   );
 }

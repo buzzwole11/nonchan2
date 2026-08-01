@@ -6,6 +6,7 @@
  * screen in view: when a card counts as "shown", and what happens when there is nothing
  * to show.
  */
+import type { SaveReason } from '@papermatch/shared-types';
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
@@ -21,6 +22,7 @@ import { SwipeDeck } from '../../src/discover/SwipeDeck';
 import { UndoToast } from '../../src/discover/UndoToast';
 import type { SwipeDirection } from '../../src/discover/deck';
 import type { FeedbackControl } from '../../src/discover/feedback';
+import { DEFAULT_SAVE_REASON, toggleReason } from '../../src/discover/saveReasons';
 import { useDeck } from '../../src/discover/useDeck';
 import { type MessageKey, translate } from '../../src/i18n';
 import { TranslationSheet } from '../../src/reading/TranslationSheet';
@@ -41,6 +43,12 @@ export default function DiscoverScreen() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackStatus, setFeedbackStatus] = useState<FeedbackStatus>({ kind: 'idle' });
+
+  // What the server has actually accepted for the paper the toast is about. Kept here
+  // rather than assumed from the taps, so a chip never sits lit for a tag that failed to
+  // save — the difference between showing state and showing a wish.
+  const [savedReasons, setSavedReasons] = useState<readonly SaveReason[]>([]);
+  const [tagError, setTagError] = useState(false);
 
   // The selection belongs to the paper it was made on, so it carries that paper's id and
   // is derived away when the card changes. Clearing it in an effect instead — which is
@@ -99,6 +107,10 @@ export default function DiscoverScreen() {
       // Dwell is reported when the card leaves, which is what the re-injection rule in
       // spec section 16 reads.
       deck.noteImpression(current.paper.id, current.position, Date.now() - shownAtRef.current);
+      // A right swipe saves with the default reason on its own (spec section 9); the tags
+      // in the toast are added afterwards, to a paper that is already in the library.
+      setSavedReasons(direction === 'right' ? [DEFAULT_SAVE_REASON] : []);
+      setTagError(false);
       void deck.act(direction);
     },
     [current, deck, openSource],
@@ -117,6 +129,25 @@ export default function DiscoverScreen() {
       // closing after each tap would make the second one a second trip.
     },
     [sendFeedback],
+  );
+
+  const { setSaveReasons } = deck;
+  const pendingPaperId = deck.state.pendingUndo?.item.paper.id ?? null;
+  const toggleSavedReason = useCallback(
+    (reason: SaveReason) => {
+      if (pendingPaperId === null) return;
+      const next = toggleReason(savedReasons, reason);
+      // Shown immediately and rolled back if the server refuses. A tag is a small enough
+      // claim that waiting for a round trip before the chip responds would feel broken.
+      setSavedReasons(next);
+      setTagError(false);
+      void setSaveReasons(pendingPaperId, next).then((ok) => {
+        if (ok) return;
+        setSavedReasons(savedReasons);
+        setTagError(true);
+      });
+    },
+    [pendingPaperId, savedReasons, setSaveReasons],
   );
 
   const selectionOffsets = useMemo(() => {
@@ -240,7 +271,14 @@ export default function DiscoverScreen() {
             locale={locale}
             onUndo={() => void deck.undo()}
             onDismiss={deck.dismissUndo}
+            reasons={savedReasons}
+            onToggleReason={toggleSavedReason}
           />
+        )}
+        {tagError && (
+          <Text variant="caption" tone="warning" accessibilityLiveRegion="polite">
+            {t('save.tagFailed')}
+          </Text>
         )}
         <ActionBar
           locale={locale}

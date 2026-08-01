@@ -114,7 +114,9 @@ AI が要る項目は環境制約で未着手です（DECISIONS.md D-024）。
 - [ ] 実翻訳 Provider の接続（`ExplanationProvider` 含む）— ネットワーク遮断のため未着手
 - [ ] Before you read（背景知識 3 項目、専門用語 3–5 項目）— AI 生成部分が必要
 - [ ] Why it matters（AI 生成であることの明示）— 同上
-- [ ] 保存理由チップの UI（API は完成済み、右スワイプ時の選択 UI が未実装）
+- [x] **保存理由チップの UI**（`src/discover/saveReasons.ts`、`UndoToast.tsx`）— 保存は先に済み、
+      タグは任意。既定の `interesting` はチップに出さず、どのタグを付けても残す。
+      サーバが保存を確認するまでチップを出さない（未確定の行に PATCH を送らないため）
 - [ ] 英語難易度の推定を実データで較正（実データ取得が Phase 1-A 待ち）
 
 ---
