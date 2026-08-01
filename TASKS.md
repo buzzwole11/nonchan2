@@ -56,7 +56,11 @@
       429 / 5xx はブレーカーを開き、それ以外の 4xx は開かない（自分側のクエリ不備で Provider を落とさない）
 - [x] ライセンスの立場を明文化し、レコードに根拠 URL を同梱（DECISIONS.md D-025）
 - [ ] **実 API への疎通確認**（`-m live`。この環境では実行不可）
-- [ ] 取り込み worker（定期実行、撤回・版更新の同期）
+- [x] **取り込み worker**（`services/worker.py`、`cli.py worker` / `cli.py runs`）—
+      discovery（新着を追う・cursor を永続化）と refresh（撤回・版更新を取り込み直す）の 2 種類。
+      再取得キューは `last_refreshed_at` で並べる（DECISIONS.md D-034）。
+      provider が返さない論文を撤回扱いにしない、失敗した run の cursor を継がない、
+      1 つの job の失敗が他を止めない、をテストで固定
 - [ ] 実データ 100 件以上でフィードが構成できることの確認（仕様書 29 節）— worker と疎通が前提
 
 ### 1-B フィード API ✅
@@ -254,7 +258,7 @@ AI が要る項目は環境制約で未着手です（DECISIONS.md D-024）。
 | --- | --- |
 | データ取得の effect | `saved` / `learn` / 翻訳シートは react-query へ移すべき（DECISIONS.md D-026） |
 | 実データ Provider | 実装済み。実 API への疎通のみ未確認（`-m live`、DECISIONS.md D-016 / D-025） |
-| 取り込み worker | 未実装。Provider は繋がるが、定期取り込みと撤回・版更新の同期がまだない |
+| 取り込み worker | 実装済み（`cli.py worker`）。実 API に対して回したことはまだない |
 | 文タップ選択の実機確認 | web ブラウザでは動作確認済み。タッチ入力での Pan/tap 競合は未確認（D-021 訂正） |
 | Discover の下スワイプ | 「Before you read」は Phase 2。現状は無反応 |
 | モバイルの E2E | Phase 1-D（Maestro）。Phase 0 の E2E は API レベル |

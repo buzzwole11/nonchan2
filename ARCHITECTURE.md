@@ -93,11 +93,12 @@ papermatch_api/
   routers/           health, auth, fields, papers, translations, feed, saved, equations
   services/          ingestion（取り込み・重複統合・監査）, feed（枠配分・多様性・調整）,
                      scoring（推薦スコア）, embeddings（ベクトルの保存と読み出し）,
-                     structure / method_kind（規則ベースの分類器）, activity, math_content
+                     structure / method_kind（規則ベースの分類器）, activity, math_content,
+                     worker（定期取り込みと撤回同期）
   providers/         base（interface）, arxiv, openalex, local_embedding, mock_*, registry
   text/              normalize, dedup, math_placeholders, latex_safety
   mathcheck/         数値代入と次元解析
-alembic/versions/    0001_initial … 0004_feed_feedback
+alembic/versions/    0001_initial … 0005_ingestion_runs
 tests/
 ```
 

@@ -194,6 +194,8 @@ class Paper(Base, TimestampMixin):
         vocab_check("source_provider", "sourceProvider"),
         CheckConstraint("year BETWEEN 1600 AND 2200", name="ck_paper_year"),
         Index("ix_papers_primary_field_year", "primary_field_id", "year"),
+        # The refresh worker's queue: "papers from this source, longest unchecked first".
+        Index("ix_papers_refresh_queue", "source_provider", "last_refreshed_at"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UuidType, primary_key=True, default=_uuid)
@@ -226,6 +228,15 @@ class Paper(Base, TimestampMixin):
     source_url: Mapped[str] = mapped_column(Text, nullable=False)
     pdf_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     acquired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    #: When the refresh worker last asked the source about this paper. Deliberately *not*
+    #: `acquired_at`: section 21 defines that one as provenance — when this copy was taken,
+    #: as the provider reports it — while this is our own operational note about when we
+    #: last checked. Ordering the refresh queue by `acquired_at` looked equivalent and was
+    #: not: a provider that echoes back a fixed timestamp leaves every paper permanently
+    #: stale, so the queue re-checks the same batch forever and never reaches the rest.
+    last_refreshed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     license_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     license_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     #: False when the terms do not permit storing or re-showing the abstract text.
@@ -784,3 +795,49 @@ class AuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class IngestionRun(Base):
+    """One execution of one ingestion job (spec sections 21, 27).
+
+    This table exists for two reasons the spec states directly.
+
+    Section 21 requires 削除・訂正・撤回情報を反映できる — a source of truth that changes
+    after we copied it. Meeting that means going back to papers we already hold and asking
+    again, which is a second kind of run with its own schedule.
+
+    Section 27 lists 同一ソースへの過剰APIアクセス as a guardrail. Without somewhere to
+    record how far a run got, every cycle would restart from the first page of every
+    source. `cursor` is what makes the next run resume instead of re-fetch.
+
+    A run row is both the record of what happened and the state the next run reads. That
+    dual purpose is deliberate: an operator asking "why has nothing new appeared since
+    Tuesday" and the scheduler asking "where do I start" want the same row.
+    """
+
+    __tablename__ = "ingestion_runs"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('running', 'succeeded', 'failed')", name="ck_ingestion_run_status"
+        ),
+        CheckConstraint("kind IN ('discovery', 'refresh')", name="ck_ingestion_run_kind"),
+        Index("ix_ingestion_runs_job", "source", "job", "started_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UuidType, primary_key=True, default=_uuid)
+    #: Provider name, so two sources never resume from each other's cursor.
+    source: Mapped[str] = mapped_column(String(32), nullable=False)
+    #: Which slice of that source. `field:hep-th` and `field:cs.LG` page independently.
+    job: Mapped[str] = mapped_column(String(128), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, default="discovery")
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="running")
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: Where this run stopped. Only read from runs that succeeded — a cursor from a failed
+    #: run points into a page that may never have been stored.
+    cursor: Mapped[str | None] = mapped_column(Text, nullable=True)
+    counts: Mapped[dict[str, Any]] = mapped_column(JsonType, nullable=False, default=dict)
+    #: Why it failed, in the operator's words rather than a stack trace.
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)

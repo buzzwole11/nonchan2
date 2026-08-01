@@ -23,6 +23,7 @@
 ## Phase 1 で追加されたもの
 
 - **Discover フィード** — 仕様書 16 節の 70/20/10 を「枠の配分」として実装。表示履歴による除外、再投入条件、分野・著者の連続抑制。各カードは推薦理由を文で持ちます。
+- **取り込み worker** — `papermatch worker` で新着の追跡（cursor を永続化し、再起動しても 1 ページ目から読み直さない）と、撤回・版更新の取り込み直しを回します。**provider が返さなくなった論文を撤回扱いにはしません** — 上流の一時障害でフィードが静かに空になるからです。
 - **推薦スコア** — 興味一致 + 質 + 新しさ + 難易度 − 直近 20 件との類似 − 同一著者。類似度は取り込み時に保存した埋め込みで測ります（プロセス内・決定的）。**スコアの数値は読者に見せません** — 理由は文で出します（仕様書 6 節）。
 - **フィード調整** — 16 節の 5 つすべて（この話題を減らす / この著者をしばらく表示しない / 類似論文を減らす / 実験系を増やす / 古典的論文を増やす）。すべて取り消せて 30 日で失効します。「実験系」は要旨から規則ベースで判定し、**分からないときはラベルを付けません**。
 - **スワイプデッキ** — 左右上下のジェスチャーと、それと同じハンドラを呼ぶボタン。
@@ -74,6 +75,28 @@ PAPERMATCH_OPENALEX_MAILTO=you@example.org     # 任意。OpenAlex の polite po
 cd apps/api && PAPERMATCH_LIVE_PROVIDERS=1 ./.venv/bin/pytest -m live -v
 ```
 
+## 取り込み worker
+
+```bash
+cd apps/api
+uv run python -m papermatch_api.cli worker --once   # 1 巡して終了（cron / 再起動ポリシー向き）
+uv run python -m papermatch_api.cli worker          # 常駐。--interval 秒ごとに 1 巡
+uv run python -m papermatch_api.cli runs            # 直近の実行ログ
+```
+
+2 種類の job が別々の周期で回ります。
+
+- **discovery** — 「新しいものは何か」。分野ごとに 1 job で、cursor を DB に持つので**再起動しても 1 ページ目から読み直しません**（仕様書 27 節のガードレール「同一ソースへの過剰APIアクセス」）。
+- **refresh** — 「いま持っているものはまだ正しいか」。仕様書 21 節の「削除・訂正・撤回情報を反映できる」がこれです。
+
+3 つの挙動をテストで固定しています。
+
+- **provider が返さなくなった論文を撤回扱いにしません。** `get_by_canonical_id` の `None` は「provider がくれなかった」であって、一時障害・識別子の移動・そもそも持っていない、のどれでもあり得ます。撤回と読むと、**上流の不調 1 回で読者のフィードが静かに空になります。**
+- **失敗した run の cursor は継ぎません。** 途中で落ちた run の cursor は、保存されていないかもしれないページを指しています。読み直しは冪等なので無料ですが、飛ばすと誰も気づきません。
+- **1 つの job の失敗が他を止めません。** 失敗は run 行に記録され、次の job は自分の番を貰います（仕様書 25 節）。
+
+再取得キューは `acquired_at` ではなく `last_refreshed_at` で並べます。前者は provider が寄こす出自で、**取得時刻を返さない provider ではキューが永久に同じバッチを回り続けます**（[`DECISIONS.md`](./DECISIONS.md) D-034 — 実際に踏みました）。
+
 ## Lint と整形
 
 | 言語 | lint | 整形 |
@@ -90,7 +113,7 @@ Markdown と手で整えた JSON は Prettier の対象外です（`.prettierign
 
 ### まだ無いもの
 
-取り込み worker（定期実行、撤回・版更新の同期）と実 API への疎通確認（上記 `-m live`、この環境では実行不可 — [`DECISIONS.md`](./DECISIONS.md) D-016）、実翻訳 Provider と AI 説明（同じくネットワーク制約 — D-024）、Maestro による E2E、Knowledge Canvas。着手順は [`TASKS.md`](./TASKS.md) にあります。
+実 API への疎通確認（上記 `-m live`、この環境では実行不可 — [`DECISIONS.md`](./DECISIONS.md) D-016）、実翻訳 Provider と AI 説明（同じくネットワーク制約 — D-024）、Maestro による E2E、Knowledge Canvas。着手順は [`TASKS.md`](./TASKS.md) にあります。
 
 ---
 
