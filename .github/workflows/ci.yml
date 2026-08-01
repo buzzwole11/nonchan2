@@ -108,9 +108,13 @@ jobs:
         with:
           node-version-file: .nvmrc
 
+      - run: npm ci
+
       - name: Regenerate and diff
-        # The generator is deterministic, so a committed corpus that differs from a fresh
-        # run means the two have drifted apart.
+        # Both generators are deterministic, so a committed output that differs from a
+        # fresh run means the two have drifted apart.
         run: |
           node scripts/generate-fixtures.mjs
           git diff --exit-code fixtures/papers.sample.json
+          node scripts/build-katex-runtime.mjs
+          git diff --exit-code apps/mobile/src/math/katexRuntime.ts

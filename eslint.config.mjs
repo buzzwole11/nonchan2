@@ -28,6 +28,8 @@ export default tseslint.config(
       '**/coverage/**',
       'apps/api/**',
       'fixtures/**',
+      // Generated: 650KB of minified KaTeX, regenerated and diffed by CI.
+      'apps/mobile/src/math/katexRuntime.ts',
     ],
   },
 
