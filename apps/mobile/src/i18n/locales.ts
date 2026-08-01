@@ -126,7 +126,8 @@ export const messages = {
     // Spec section 16 の 5 つのフィード調整。文言はすべて「今回は見送る」の側に寄せてあり、
     // 「嫌い」「興味なし」とは書きません — 押した人がそう言ったことにされないためです。
     'feedback.title': '表示を調整する',
-    'feedback.intro': 'どれも取り消せます。しばらくのあいだ出方が変わるだけで、二度と出てこなくなるわけではありません。',
+    'feedback.intro':
+      'どれも取り消せます。しばらくのあいだ出方が変わるだけで、二度と出てこなくなるわけではありません。',
     'feedback.hideTopic': 'この話題を減らす',
     'feedback.hideTopicHint': '{field} のカードをしばらく控えめにします',
     'feedback.hideAuthor': 'この著者をしばらく表示しない',
@@ -414,7 +415,8 @@ export const messages = {
     // Section 16's five feed controls. Every string sits on the 「今回は見送る」 side — none
     // of them says "dislike" or "not interested", because the reader did not say that.
     'feedback.title': 'Adjust what you see',
-    'feedback.intro': 'All of these can be undone. They change the mix for a while; nothing is hidden for good.',
+    'feedback.intro':
+      'All of these can be undone. They change the mix for a while; nothing is hidden for good.',
     'feedback.hideTopic': 'Less of this topic',
     'feedback.hideTopicHint': 'Eases off {field} cards for a while',
     'feedback.hideAuthor': 'Pause this author',
