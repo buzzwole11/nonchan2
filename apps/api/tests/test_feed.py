@@ -31,6 +31,7 @@ from papermatch_api.services.feed import (
     suppressed_author_keys,
     suppressed_field_ids,
 )
+from papermatch_api.services.scoring import WEIGHTS
 from tests.conftest import requires_db
 
 pytestmark = [pytest.mark.integration, requires_db]
@@ -95,8 +96,21 @@ def test_feed_returns_cards_with_explainable_reasons(seeded_db: Session, user: U
     for item in page.items:
         assert item.reasons, "every card must say why it is here (spec section 6)"
         assert item.pool in {"matched", "adjacent", "exploration"}
-        assert set(item.breakdown) == {"interest", "difficulty", "freshness", "quality"}
+        assert set(WEIGHTS) <= set(item.breakdown), "every scored term is accounted for"
         assert reason_text(item.reasons, "ja-JP")
+
+
+def test_reasons_come_from_the_fixed_vocabulary_not_from_the_score(
+    seeded_db: Session, user: User
+) -> None:
+    """The scorer names its own terms (`interest`, `freshness`); a card's reason is a
+    sentence from `enums.json`. Leaking one vocabulary into the other would put an
+    untranslated component name on a card."""
+    _set_interests(seeded_db, user, ["hep-th", "cs.LG"])
+    allowed = {"matches_field", "adjacent_field", "similar_to_saved", "recent", "foundational"}
+    for item in build_feed(seeded_db, user, limit=10).items:
+        assert set(item.reasons) <= allowed
+        assert not set(item.reasons) & set(item.breakdown)
 
 
 def test_reason_text_is_localised_and_short(seeded_db: Session) -> None:
@@ -349,15 +363,26 @@ def test_reshow_disabled_means_never(seeded_db: Session, user: User) -> None:
 
 def test_math_level_zero_filters_out_formula_heavy_papers(seeded_db: Session, user: User) -> None:
     """Spec section 18, Level 0: 数式を表示しない."""
-    user.settings.math_level = "level_0"
-    seeded_db.flush()
     _set_interests(seeded_db, user, ["hep-th", "cs.LG", "math.AP"])
 
-    page = build_feed(seeded_db, user, limit=10)
-    dense = [i for i in page.items if i.paper.math_density > 0.5]
+    def difficulty_by_paper(level: str) -> dict[uuid.UUID, float]:
+        user.settings.math_level = level
+        seeded_db.flush()
+        return {
+            item.paper.id: item.breakdown["difficulty"]
+            for item in build_feed(seeded_db, user, limit=50).items
+            if item.paper.math_density > 0.5
+        }
+
+    # Compared against another level rather than against a fixed number: a threshold like
+    # "< 0.6" keeps passing after a reweighting that stopped level 0 from meaning anything.
+    tolerant = difficulty_by_paper("level_3")
+    strict = difficulty_by_paper("level_0")
+
+    assert strict, "expected formula-heavy papers to still be in the deck"
     # Level 0 zeroes the maths component of the fit score, so dense papers sink; they are
     # not hard-excluded, because a card is still better than an empty deck.
-    assert all(i.breakdown["difficulty"] < 0.6 for i in dense)
+    assert all(strict[paper_id] < tolerant[paper_id] for paper_id in strict)
 
 
 def test_saved_field_overlap_is_labelled(seeded_db: Session, user: User) -> None:

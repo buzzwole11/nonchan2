@@ -31,6 +31,7 @@ from papermatch_api.models import (
     PaperIdentifier,
 )
 from papermatch_api.providers.base import PaperProvider, PaperQuery, PaperRecord
+from papermatch_api.services.embeddings import store_paper_embedding
 from papermatch_api.services.structure import classify
 from papermatch_api.text.dedup import compute_identity
 from papermatch_api.text.normalize import normalize_title
@@ -254,6 +255,11 @@ def upsert_record(session: Session, record: PaperRecord) -> tuple[Paper, str]:
     _apply_identifiers(session, paper, record)
     _apply_field_weights(session, paper, record)
     _apply_segments(session, paper, record.raw)
+    session.flush()
+    # After the flush, because the vector is keyed on the paper's id. Embedding at
+    # ingestion rather than at feed time is what keeps the feed a read: computing 500
+    # vectors while someone waits for their next card is not a trade worth making.
+    store_paper_embedding(session, paper)
     session.flush()
     return paper, outcome
 

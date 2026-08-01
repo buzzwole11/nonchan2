@@ -18,8 +18,18 @@ step rather than folded into one score:
 * **Nothing is shown twice.** Section 16: 一度表示した論文は原則再表示しない, with narrow
   re-injection conditions implemented in :func:`reinjectable_paper_ids`.
 
-Phase 3 replaces the within-pool scoring with embedding similarity. The pool split, the
-diversity pass and the reason labels stay.
+Phase 3 replaces the within-pool scoring with :mod:`papermatch_api.services.scoring`, which
+adds the two things the old inline formula could not express: how much this card repeats the
+last twenty (measured on embeddings, not field labels) and how often the reader has just
+seen these authors. The pool split, the diversity pass and the reason labels stay exactly as
+they were.
+
+**Reasons are not score components.** `scoring.explain()` names the terms that moved a total
+— `interest`, `freshness` — while a card's reason comes from a fixed vocabulary in
+`enums.json` (`matches_field`, `adjacent_field`, `similar_to_saved`, `recent`,
+`foundational`). Those are different claims: one is about the arithmetic, the other is a
+sentence shown to a reader in two languages. The scorer decides order; the reason labels
+below decide what the card says, and neither is derived from the other.
 """
 
 from __future__ import annotations
@@ -43,6 +53,13 @@ from papermatch_api.models import (
     SavedPaper,
     User,
 )
+from papermatch_api.services.embeddings import embeddings_for
+from papermatch_api.services.scoring import (
+    SIGNIFICANT_FIELD_WEIGHT,
+    ReaderContext,
+    ScoreInput,
+    score_candidate,
+)
 from papermatch_api.text.normalize import normalize_author_key
 
 #: Section 16 mix. Kept as data so the split is inspectable and testable.
@@ -62,9 +79,10 @@ DIVERSITY_WINDOW = 20
 SUPPRESSION_ACTIONS = ("hide_topic", "hide_author")
 SUPPRESSION_DAYS = 30
 
-#: Minimum field weight for a paper to count as belonging to that field when choosing a
-#: pool. Below this the tag is incidental, not what the paper is about.
-SIGNIFICANT_FIELD_WEIGHT = 0.15
+#: How many authors of a paper the repeated-author penalty looks at. The byline a card
+#: actually shows, rather than every name on a hundred-author collaboration — otherwise one
+#: large paper would suppress an entire subfield for the next twenty cards.
+PENALISED_AUTHORS = 3
 
 #: Ceiling on how deep each pool is ranked. The whole sequence is built per request so
 #: that paging stays stable, and this keeps that cost bounded as the corpus grows.
@@ -242,67 +260,87 @@ def _candidate_query(user: User, reinjectable: set[uuid.UUID]) -> Select[tuple[P
 # ------------------------------------------------------------------------------ scoring
 
 
-def _freshness(year: int, now_year: int) -> float:
-    """1.0 for this year, decaying to 0 over roughly a decade."""
-    age = max(0, now_year - year)
-    return max(0.0, 1.0 - age / 10.0)
+def _author_keys(paper: Paper) -> tuple[str, ...]:
+    """Normalised keys for the authors a card actually shows.
 
-
-def _difficulty_fit(paper: Paper, user: User) -> float:
-    """How well the paper's English and maths load match the user's declared levels.
-
-    Spec section 18 lets the user say where they are; a paper far above or below that is
-    less useful even if the topic is a perfect match.
+    Normalised on both sides of the comparison — "A. Fujimoto" and "Akira Fujimoto" are one
+    person, and a penalty that missed that would be a penalty that mostly does not fire.
     """
-    english_order = ["beginner", "intermediate", "advanced", "native_like"]
-    try:
-        want = english_order.index(user.settings.english_level)
-        have = english_order.index(paper.english_level)
-    except ValueError:
-        want = have = 1
-    english_fit = 1.0 - abs(want - have) / (len(english_order) - 1)
-
-    # Maths level 0 means "do not show me formulas at all" (spec section 18).
-    math_level = user.settings.math_level
-    if math_level == "level_0":
-        math_fit = 1.0 if paper.math_density <= 0.5 else 0.0
-    else:
-        wanted_density = {"level_1": 1.0, "level_2": 2.5, "level_3": 4.0, "level_4": 6.0}.get(
-            math_level, 2.5
-        )
-        math_fit = max(0.0, 1.0 - abs(paper.math_density - wanted_density) / 8.0)
-
-    return 0.5 * english_fit + 0.5 * math_fit
+    keys: list[str] = []
+    for entry in (paper.authors or [])[:PENALISED_AUTHORS]:
+        name = entry.get("name") if isinstance(entry, dict) else None
+        if isinstance(name, str) and name.strip():
+            keys.append(normalize_author_key(name))
+    return tuple(keys)
 
 
-def _quality_proxy(paper: Paper) -> float:
-    """A deliberately weak stand-in, not a judgement of the work.
+def _score_input(paper: Paper, embedding: list[float]) -> ScoreInput:
+    """Translate a database row into what the scorer judges.
 
-    Spec section 2 is explicit that this is not a peer-review-quality app, so nothing here
-    claims to measure merit. It only prefers records we can actually show well: open
-    access, a real venue, a resolvable identifier.
+    The scorer takes plain values rather than a `Paper` on purpose: it is the one piece of
+    this system whose behaviour has to be pinned down by tests that construct their own
+    inputs, and a scorer that needed a populated session to run would not get those tests.
     """
-    score = 0.0
-    if paper.open_access in {"gold", "green", "hybrid"}:
-        score += 0.5
-    if paper.venue:
-        score += 0.25
-    if any(i.kind in {"doi", "arxiv"} for i in paper.identifiers):
-        score += 0.25
-    return min(1.0, score)
+    return ScoreInput(
+        paper_id=str(paper.id),
+        year=paper.year,
+        primary_field_id=paper.primary_field_id,
+        field_weights={fw.field_id: fw.weight for fw in paper.field_weights},
+        author_names=_author_keys(paper),
+        english_level=paper.english_level,
+        math_density=paper.math_density,
+        open_access=paper.open_access,
+        has_venue=bool(paper.venue),
+        has_resolvable_id=any(i.kind in {"doi", "arxiv"} for i in paper.identifiers),
+        embedding=embedding,
+    )
 
 
-def _interest_strength(paper: Paper, interests: dict[str, Interest]) -> float:
-    weights = {fw.field_id: fw.weight for fw in paper.field_weights}
-    if paper.primary_field_id:
-        weights.setdefault(paper.primary_field_id, 0.5)
-    best = 0.0
-    for field_id, weight in weights.items():
-        interest = interests.get(field_id)
-        if interest is None:
-            continue
-        best = max(best, interest.strength * max(0.2, weight))
-    return best
+def _reader_context(
+    session: Session,
+    user: User,
+    interests: dict[str, Interest],
+    adjacent_field_ids: set[str],
+) -> tuple[ReaderContext, list[str]]:
+    """What the reader asked for, and what they have just been shown.
+
+    Returns the recently shown primary fields alongside, because the diversity pass needs
+    the same window and reading the impression log twice would be two chances to disagree
+    about what "recent" means.
+    """
+    recent = list(
+        session.execute(
+            # Only the primary field, the byline and the id are read here, and all three
+            # are plain columns — no relationship needs eager loading.
+            select(Paper)
+            .join(Impression, Impression.paper_id == Paper.id)
+            .where(Impression.user_id == user.id)
+            .order_by(Impression.shown_at.desc())
+            .limit(DIVERSITY_WINDOW)
+        ).scalars()
+    )
+
+    vectors = embeddings_for(session, [paper.id for paper in recent])
+    author_counts: dict[str, int] = {}
+    for paper in recent:
+        for key in _author_keys(paper):
+            author_counts[key] = author_counts.get(key, 0) + 1
+
+    context = ReaderContext(
+        interest_strengths={
+            field_id: interest.strength for field_id, interest in interests.items()
+        },
+        # The feed's own notion of adjacency — siblings under a shared parent, plus the
+        # parent itself. The scorer calls these "parents" because that is where the credit
+        # comes from; here they are whatever the 20% pool is drawn from, so the two stay
+        # consistent by construction.
+        interest_parent_ids=frozenset(adjacent_field_ids),
+        english_level=user.settings.english_level,
+        math_level=user.settings.math_level,
+        recent_embeddings=tuple(vectors[paper.id] for paper in recent if paper.id in vectors),
+        recent_author_counts=author_counts,
+    )
+    return context, [paper.primary_field_id for paper in recent if paper.primary_field_id]
 
 
 def significant_fields(paper: Paper) -> set[str]:
@@ -477,6 +515,8 @@ def build_feed(
     ) - {None}
 
     papers = list(session.execute(_candidate_query(user, reinjectable)).scalars())
+    reader, recent_fields = _reader_context(session, user, interests, adjacent_field_ids)
+    vectors = embeddings_for(session, [paper.id for paper in papers])
 
     now_year = now.year
     candidates: dict[str, list[Candidate]] = {"matched": [], "adjacent": [], "exploration": []}
@@ -489,19 +529,20 @@ def build_feed(
             continue
 
         pool = _pool_for(paper, interest_field_ids, adjacent_field_ids)
-        interest = _interest_strength(paper, interests)
-        freshness = _freshness(paper.year, now_year)
-        difficulty = _difficulty_fit(paper, user)
-        quality = _quality_proxy(paper)
+        scored = score_candidate(_score_input(paper, vectors.get(paper.id, [])), reader, now=now)
+        score = scored.total
+        breakdown = {name: round(value, 4) for name, value in scored.components.items()}
 
-        # Weights inside a pool. The pool split already handled the 70/20/10 mix, so these
-        # only decide ordering among comparable candidates.
-        score = 0.40 * interest + 0.20 * difficulty + 0.20 * freshness + 0.20 * quality
         if pool == "exploration":
             # Deterministic jitter keyed by paper and snapshot: exploration should not
-            # always surface the same handful of papers, but paging must stay stable.
+            # always surface the same handful of papers, but paging must stay stable. It is
+            # a tie-break inside the pool, not a bonus — the pool split already decided that
+            # one card in ten comes from here, so nothing this adds is ever compared against
+            # a card from another pool.
             digest = hashlib.sha256(f"{seed}:{paper.canonical_id}".encode()).digest()
-            score += (digest[0] / 255.0) * 0.30
+            jitter = (digest[0] / 255.0) * 0.30
+            score += jitter
+            breakdown["tie_break"] = round(jitter, 4)
 
         reasons: list[str] = []
         if pool == "matched":
@@ -524,12 +565,7 @@ def build_feed(
                 pool=pool,
                 score=score,
                 reasons=reasons,
-                breakdown={
-                    "interest": round(interest, 4),
-                    "difficulty": round(difficulty, 4),
-                    "freshness": round(freshness, 4),
-                    "quality": round(quality, 4),
-                },
+                breakdown=breakdown,
             )
         )
 
@@ -540,18 +576,6 @@ def build_feed(
         del pool_items[MAX_CANDIDATES_PER_POOL:]
 
     total = sum(len(v) for v in candidates.values())
-
-    recent_fields = [
-        row
-        for row in session.execute(
-            select(Paper.primary_field_id)
-            .join(Impression, Impression.paper_id == Paper.id)
-            .where(Impression.user_id == user.id)
-            .order_by(Impression.shown_at.desc())
-            .limit(DIVERSITY_WINDOW)
-        ).scalars()
-        if row
-    ]
 
     # The whole sequence is built every request and then sliced, rather than being built
     # only up to `offset + limit`: a sequence truncated to the page length would order its

@@ -42,10 +42,12 @@ packages/design-tokens  ← UI が読む唯一の視覚定義
 | --- | --- | --- |
 | `PaperProvider` | 論文メタデータ | `MockPaperProvider`（fixture） |
 | `TranslationProvider` | 選択範囲の翻訳 | `MockTranslationProvider` |
-| `EmbeddingProvider` | 意味ベクトル | 未実装（Phase 3） |
+| `EmbeddingProvider` | 意味ベクトル | `LocalEmbeddingProvider`（Phase 3・プロセス内） |
 | `ExplanationProvider` | AI 説明 | 未実装（Phase 2） |
 | `MathVerifier` | 数式変形の検証 | 未実装（Phase 5） |
 | `FullTextProvider` | 本文・LaTeX ソース | 未実装（Phase 5） |
+
+`LocalEmbeddingProvider` は代用品ではなく実装です（ハッシュ化 BoW・512 次元・決定的）。言い換えの検出は文埋め込みに劣りますが、16 節が類似度に求めているのは「次のカードがさっきのカードと同じ話か」で、これは共有された専門語彙として現れます。ホスト型モデルに差し替えるときは `embeddings` 行の `model` / `version` が変わるだけで、両者が混ざることはありません（D-006）。
 
 ルータは具象クラスを import しません。`providers/registry.py` に設定値から解決を依頼します。arXiv を OpenAlex に差し替えても、mock を本物に差し替えても、ハンドラは変わりません。
 

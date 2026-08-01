@@ -30,9 +30,10 @@ def candidate(**overrides: object) -> ScoreInput:
         "english_level": "intermediate",
         "math_density": 3.0,
         "open_access": "green",
+        "has_venue": True,
+        "has_resolvable_id": True,
         "citation_count": 12,
         "embedding": [],
-        "pool": "matched",
     }
     base.update(overrides)
     return ScoreInput(**base)  # type: ignore[arg-type]
@@ -40,7 +41,7 @@ def candidate(**overrides: object) -> ScoreInput:
 
 def reader(**overrides: object) -> ReaderContext:
     base: dict[str, object] = {
-        "interest_field_ids": frozenset({"hep-th"}),
+        "interest_strengths": {"hep-th": 1.0},
         "interest_parent_ids": frozenset({"physics"}),
         "english_level": "intermediate",
         "math_level": "level_2",
@@ -83,15 +84,27 @@ def test_an_incidental_field_tag_does_not_count_as_a_match() -> None:
     assert incidental.components["interest"] == 0.0
 
 
-def test_the_exploration_pool_is_credited_for_being_unfamiliar() -> None:
-    """Otherwise the scorer immediately ranks every exploration card last and the 10%
-    slot becomes a lottery."""
-    explore = score_candidate(
-        candidate(primary_field_id="math.NT", field_weights={"math.NT": 0.9}, pool="exploration"),
-        reader(),
-        now=NOW,
+def test_interest_orders_papers_within_the_same_pool() -> None:
+    """The reason the interest term is graded rather than a 1.0/0.5/0 membership test.
+
+    Under D-017 every card in the matched pool is compared only against other matched
+    cards, so a term that returned the same value for all of them would leave the largest
+    weight in the model ordering nothing.
+    """
+    mostly = score_candidate(
+        candidate(field_weights={"hep-th": 0.9, "physics": 0.1}), reader(), now=NOW
     )
-    assert explore.components["exploration"] > 0
+    partly = score_candidate(
+        candidate(field_weights={"hep-th": 0.3, "cs.LG": 0.6}), reader(), now=NOW
+    )
+    assert mostly.components["interest"] > partly.components["interest"] > 0
+
+
+def test_a_weaker_declared_interest_scores_below_a_stronger_one() -> None:
+    """Onboarding lets a reader weight their interests; the feed has to honour that."""
+    keen = score_candidate(candidate(), reader(interest_strengths={"hep-th": 1.0}), now=NOW)
+    mild = score_candidate(candidate(), reader(interest_strengths={"hep-th": 0.4}), now=NOW)
+    assert keen.components["interest"] > mild.components["interest"] > 0
 
 
 # ------------------------------------------------------------------------- difficulty
@@ -111,9 +124,24 @@ def test_difficulty_fit_is_symmetric() -> None:
 
 
 def test_maths_density_moves_the_fit_towards_the_reader_setting() -> None:
-    dense = difficulty_fit(candidate(math_density=9.0), reader(math_level="level_0"))
-    sparse = difficulty_fit(candidate(math_density=0.2), reader(math_level="level_0"))
-    assert sparse > dense
+    dense = difficulty_fit(candidate(math_density=9.0), reader(math_level="level_3"))
+    sparse = difficulty_fit(candidate(math_density=0.2), reader(math_level="level_3"))
+    assert dense > sparse
+
+
+def test_math_level_zero_gives_a_formula_heavy_paper_nothing_but_still_scores_it() -> None:
+    """Section 18 reads level 0 as 数式を表示しない — a statement, not a preference to trade
+    off. It is still not a filter: a hard exclusion would empty the deck for a reader who
+    chose a mathematical field and level 0 together."""
+    zero = reader(math_level="level_0")
+    dense = score_candidate(candidate(math_density=9.0), zero, now=NOW)
+    sparse = score_candidate(candidate(math_density=0.2), zero, now=NOW)
+
+    assert sparse.components["difficulty"] > dense.components["difficulty"]
+    assert difficulty_fit(candidate(math_density=9.0), zero) == difficulty_fit(
+        candidate(math_density=40.0), zero
+    ), "past the threshold it is already zero; more formulas cannot make it worse"
+    assert dense.total > 0, "sunk, not excluded"
 
 
 def test_an_unknown_level_does_not_crash_the_score() -> None:

@@ -117,13 +117,25 @@ AI が要る項目は環境制約で未着手です（DECISIONS.md D-024）。
 
 ## Phase 3 — 推薦
 
-- [ ] `EmbeddingProvider` 実装
+- [x] **`EmbeddingProvider` 実装**（`providers/local_embedding.py`）— ハッシュ化 BoW、512 次元、
+      L2 正規化。決定的で、ネットワークを必要としない（DECISIONS.md D-016）
+- [x] **取り込み時にベクトルを保存**（`services/embeddings.py`）— フィードを読み取りのままに保つ。
+      500 本のベクトルを、次のカードを待っている人の前で計算する取引はしない
+- [x] **スコアリング**（`services/scoring.py`）— interest + quality + freshness + difficulty
+      − similarity − author。**探索ボーナスは置かない**（DECISIONS.md D-032）
+- [x] **フィードへの接続**（`services/feed.py`）— インラインの式を差し替え。理由の語彙はそのまま
+- [x] 配合の既定値 70/20/10（仕様書 16 節）— Phase 1 で実装済み、今回も変えていない
+- [x] **直近 20 件との類似ペナルティ**（埋め込みで測る）、**同一著者の連続抑制**（正規化キーで照合）
+- [x] 推薦理由の文言生成（単一スコアを見せない）— Phase 1 で実装済み。スコアラーとは語彙が別
 - [ ] pgvector 列と HNSW インデックスの migration（DECISIONS.md D-006）
-- [ ] スコアリング（interest + quality + freshness + difficulty + exploration − similarity − author）
-- [ ] 配合の既定値 70/20/10（仕様書 16 節）
-- [ ] 直近 20 件との類似ペナルティ、同一著者・同一テーマの連続抑制
-- [ ] 推薦理由の文言生成（単一スコアを見せない）
 - [ ] フィード調整のフィードバック UI
+
+> **いま interest の項が平らである件。** 種データでも実データでも、arXiv provider は主分野に一律
+> 0.7、親に 0.2 を振ります（`providers/arxiv.py`）。興味の強さも既定が 1.0 です。したがって
+> matched プールの中では interest が全員 0.7 になり、並び順は quality / difficulty / freshness と
+> ペナルティで決まっています。**式のせいではなく上流のせい**で、強さを変えれば実際に刻まれること
+> は確認済み（hep-th 1.0 → 0.700 / cs.LG 0.4 → 0.280）。差し替え前のインラインの式も同じ理由で
+> 平らでした。分野の重みを本当に推定するのは分類器の仕事で、ここではありません。
 
 ---
 
