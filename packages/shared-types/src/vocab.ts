@@ -39,6 +39,8 @@ export const PAPER_TYPES = [
   'published',
   'classic',
   'recent',
+  'theoretical',
+  'experimental',
 ] as const;
 
 export const OPEN_ACCESS_STATUSES = [
@@ -113,6 +115,9 @@ export const ACTION_TYPES = [
   'expand_math',
   'hide_topic',
   'hide_author',
+  'less_similar',
+  'more_experimental',
+  'more_classic',
   'undo',
 ] as const;
 

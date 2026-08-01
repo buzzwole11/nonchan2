@@ -13,7 +13,7 @@
     "values": ["arxiv", "openalex", "semantic_scholar", "crossref", "mock", "manual"]
   },
   "paperType": {
-    "$note": "Section 18: 論文種別.",
+    "$note": "Section 18: 論文種別, plus the theory/experiment axis section 16 balances the feed on. `theoretical` and `experimental` are assigned by a rule-based classifier that abstains when the abstract does not say clearly, so a paper carrying neither means 'not determined', never 'neither'.",
     "values": [
       "original",
       "review",
@@ -22,7 +22,9 @@
       "preprint",
       "published",
       "classic",
-      "recent"
+      "recent",
+      "theoretical",
+      "experimental"
     ]
   },
   "openAccessStatus": {
@@ -87,7 +89,7 @@
     ]
   },
   "actionType": {
-    "$note": "Section 23: Action.",
+    "$note": "Section 23: Action. The last five are section 16's feed feedback, and every one of them is a nudge the user can undo — section 16: 否定的フィードバックを「嫌い」と決めつけない.",
     "values": [
       "skip",
       "save",
@@ -96,6 +98,9 @@
       "expand_math",
       "hide_topic",
       "hide_author",
+      "less_similar",
+      "more_experimental",
+      "more_classic",
       "undo"
     ]
   },

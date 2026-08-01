@@ -28,6 +28,16 @@ from sqlalchemy.orm import Session
 from papermatch_api import vocab
 from papermatch_api.models import Action, AuditLog, Impression, Paper, SavedPaper, User
 
+#: Actions that are *about* one paper and cannot be recorded without it.
+REQUIRES_PAPER = frozenset({"skip", "save", "open_source", "translate", "expand_math"})
+
+#: Actions that take the card off the deck, and whose undo therefore has to put it back.
+#: `hide_topic` and `hide_author` are here because the UI sends them as the card leaves, so
+#: undoing one is undoing that whole gesture. The three feed nudges are not: 実験系を増やす
+#: asks for a different mix rather than for this paper back, and resurrecting a card the
+#: reader had already moved past would be a change they did not ask for.
+CONSUMES_CARD = REQUIRES_PAPER | {"hide_topic", "hide_author"}
+
 
 class ActivityError(Exception):
     """Raised for a request that is well-formed but not applicable."""
@@ -224,7 +234,7 @@ def record_action(
 
     payload = dict(payload or {})
 
-    requires_paper = action_type in {"skip", "save", "open_source", "translate", "expand_math"}
+    requires_paper = action_type in REQUIRES_PAPER
     if requires_paper and paper_id is None:
         raise ActivityError("paper_required", f"{action_type} needs a paperId")
     # Loaded whenever one was supplied, not only when it is mandatory: `hide_topic` and
@@ -326,12 +336,17 @@ def undo_action(session: Session, user: User, action_id: uuid.UUID) -> Action:
             if saved_row is not None and saved_row.status == "source_opened":
                 saved_row.status = previous
 
-    # hide_topic / hide_author need no explicit reversal: the suppression query in
-    # services.feed only counts actions that are not undone.
+    # hide_topic / hide_author and the three feed nudges need no explicit reversal: the
+    # queries in services.feed count only actions that are not undone.
 
-    if original.paper_id is not None:
+    if original.paper_id is not None and original.action_type in CONSUMES_CARD:
         # Clear the trace so the card is eligible again. Without this, an undone skip
         # would look reversed in the library but never reappear in Discover.
+        #
+        # Only for the actions that actually took the card off the deck. A feed nudge is
+        # sent *from* a card without consuming it — 実験系を増やす asks for a different mix,
+        # not for this paper back — and resurrecting an unrelated card the reader had
+        # already moved past would be a change they did not ask for.
         session.execute(
             delete(Impression).where(
                 Impression.user_id == user.id, Impression.paper_id == original.paper_id

@@ -90,11 +90,14 @@ papermatch_api/
   security.py        ゲスト JWT と current_user 依存
   vocab.py           enums.json のローダ
   cli.py             seed コマンド
-  routers/           health, auth, fields, papers, translations
-  services/          ingestion（取り込み・重複統合・監査）
-  providers/         base（interface）, mock_paper, mock_translation, registry
-  text/              normalize, dedup, math_placeholders
-alembic/versions/    0001_initial
+  routers/           health, auth, fields, papers, translations, feed, saved, equations
+  services/          ingestion（取り込み・重複統合・監査）, feed（枠配分・多様性・調整）,
+                     scoring（推薦スコア）, embeddings（ベクトルの保存と読み出し）,
+                     structure / method_kind（規則ベースの分類器）, activity, math_content
+  providers/         base（interface）, arxiv, openalex, local_embedding, mock_*, registry
+  text/              normalize, dedup, math_placeholders, latex_safety
+  mathcheck/         数値代入と次元解析
+alembic/versions/    0001_initial … 0004_feed_feedback
 tests/
 ```
 
@@ -196,7 +199,7 @@ POST /translations
 | 1 | arXiv / OpenAlex Provider | `providers/` に 2 ファイル + registry に登録。ルータは無変更 |
 | 1 | `/feed`、`/impressions`、`/actions`、`/saved` | `routers/` 追加。表示履歴テーブルは既に存在 |
 | 1 | スワイプデッキ、オンボーディング、翻訳シート | `apps/mobile/app/` |
-| 3 | 埋め込みと多様性スコア | `EmbeddingProvider` 実装 + pgvector 列を追加する migration |
+| 3 | ~~埋め込みと多様性スコア~~ 済 | `local_embedding` + `services/scoring`。残るは pgvector 列の migration（D-006） |
 | 4–5 | 数式カードと検証 | `Equation` / `DerivationStep` / `MathCard` は既にスキーマにある |
 | 6 | Canvas | `CanvasPosition` は既にスキーマにある |
 

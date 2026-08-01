@@ -185,6 +185,92 @@ def suppressed_author_keys(session: Session, user: User, now: datetime | None = 
     return keys
 
 
+#: How many taps it takes for a nudge to reach its full effect. Section 16 treats feedback
+#: as 「今回は見送る」, so one tap is a hint rather than a setting change; a reader who means
+#: it says so repeatedly and gets there in three.
+NUDGE_SATURATION = 3
+
+#: The three controls read from the action log. `hide_topic` and `hide_author` are the other
+#: two of section 16's five; those exclude rather than weigh, so they are handled separately.
+NUDGE_ACTIONS = ("less_similar", "more_experimental", "more_classic")
+
+#: What a saturated `more_*` nudge adds, in the same units as `scoring.WEIGHTS`. Comparable
+#: to the freshness term: enough to visibly change the deck, not enough to override a field
+#: the reader chose. `less_similar` is not here because it is a multiplier on a penalty the
+#: scorer already computed rather than a flat addition — see :func:`apply_nudges`.
+NUDGE_STRENGTH: dict[str, float] = {
+    "more_experimental": 0.35,
+    "more_classic": 0.35,
+}
+
+
+def feedback_nudges(session: Session, user: User, now: datetime | None = None) -> dict[str, float]:
+    """How hard the reader has leaned on each feed control, from 0 to 1.
+
+    Read from the action log for the same reason the suppressions are: Undo already works
+    (the query counts only actions that are not undone) and the window already expires
+    them, so neither needs any bookkeeping of its own. It also means the reader can see
+    every nudge they have made in their own activity history rather than having to infer it
+    from a feed that quietly changed shape.
+
+    Saturating rather than linear, and capped: section 16 says negative feedback is not
+    「嫌い」, and a control that could be pressed twenty times into a permanent ban would be
+    exactly that.
+    """
+    now = now or datetime.now(tz=UTC)
+    rows = session.execute(
+        select(Action.action_type, func.count())
+        .where(
+            Action.user_id == user.id,
+            Action.action_type.in_(NUDGE_ACTIONS),
+            Action.undone.is_(False),
+            Action.created_at >= _suppression_cutoff(now),
+        )
+        .group_by(Action.action_type)
+    ).all()
+    counts: dict[str, int] = dict(rows)  # type: ignore[arg-type]
+    return {name: min(1.0, counts.get(name, 0) / NUDGE_SATURATION) for name in NUDGE_ACTIONS}
+
+
+def apply_nudges(
+    paper: Paper, components: dict[str, float], nudges: dict[str, float], now_year: int
+) -> dict[str, float]:
+    """What the reader's feed controls add to this paper, as named terms.
+
+    Returned separately from the score components rather than folded into them, and named
+    after the button that produced each one. A reader who presses 実験系を増やす and then
+    asks why the deck changed should find the answer spelled out, not distributed across
+    `interest` and `freshness` where nothing points back at what they did.
+
+    Each term is zero when the button was never pressed, so an untouched feed is scored
+    exactly as it was before these existed.
+    """
+    applied: dict[str, float] = {}
+    types = set(paper.paper_types or [])
+
+    # A multiplier on the penalty the scorer already computed, not a flat subtraction. It is
+    # therefore absent for a paper that resembles nothing the reader saw — there is nothing
+    # to suppress there, and a flat penalty would punish every card for the sin of a few.
+    similar = nudges.get("less_similar", 0.0)
+    if similar:
+        applied["less_similar"] = components.get("similarity_penalty", 0.0) * similar
+
+    experimental = nudges.get("more_experimental", 0.0)
+    if experimental and "experimental" in types:
+        applied["more_experimental"] = NUDGE_STRENGTH["more_experimental"] * experimental
+
+    # `classic` is a label the provider assigns; the age fallback covers a corpus where it
+    # never does. Both are the same claim — this is not new work for the reader.
+    classic = nudges.get("more_classic", 0.0)
+    if classic and ("classic" in types or paper.year <= now_year - 8):
+        applied["more_classic"] = NUDGE_STRENGTH["more_classic"] * classic
+
+    # A term worth exactly nothing is not a term. Keeping it would put `less_similar: -0.0`
+    # on every card of a reader who pressed the button once, which reads as "this control is
+    # doing something here" when it is not.
+    return {name: value for name, value in applied.items() if value}
+
+
 def reinjectable_paper_ids(
     session: Session, user: User, now: datetime | None = None
 ) -> set[uuid.UUID]:
@@ -501,6 +587,7 @@ def build_feed(
 
     suppressed_fields = suppressed_field_ids(session, user, now)
     suppressed_authors = suppressed_author_keys(session, user, now)
+    nudges = feedback_nudges(session, user, now)
     reinjectable = reinjectable_paper_ids(session, user, now)
 
     # Field-level overlap with what the user already saved. This is honestly a proxy for
@@ -532,6 +619,10 @@ def build_feed(
         scored = score_candidate(_score_input(paper, vectors.get(paper.id, [])), reader, now=now)
         score = scored.total
         breakdown = {name: round(value, 4) for name, value in scored.components.items()}
+
+        applied = apply_nudges(paper, scored.components, nudges, now_year)
+        score += sum(applied.values())
+        breakdown.update({name: round(value, 4) for name, value in applied.items()})
 
         if pool == "exploration":
             # Deterministic jitter keyed by paper and snapshot: exploration should not

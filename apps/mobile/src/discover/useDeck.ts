@@ -21,6 +21,7 @@ import {
   nextCard,
   shouldPrefetch,
 } from './deck';
+import { type FeedbackControl, feedbackRequest, needsReload } from './feedback';
 
 const PAGE_SIZE = 20;
 
@@ -35,6 +36,11 @@ export interface DeckController {
   /** Called when a card becomes visible, and again with dwell when it leaves. */
   noteImpression: (paperId: string, position: number, dwellMs?: number) => void;
   reload: () => void;
+  /**
+   * Send one of section 16's five feed controls. Resolves to the action id so the caller
+   * can offer Undo, or to null when the request could not be sent.
+   */
+  sendFeedback: (control: FeedbackControl) => Promise<string | null>;
 }
 
 export function useDeck(): DeckController {
@@ -169,6 +175,29 @@ export function useDeck(): DeckController {
     void loadPage(null, { allowCache: true });
   }, [loadPage]);
 
+  const sendFeedback = useCallback(
+    async (control: FeedbackControl): Promise<string | null> => {
+      const request = feedbackRequest(control, currentCard(stateRef.current));
+      if (request === null) return null;
+      try {
+        const response = await api.recordAction(request);
+        if (needsReload(control.kind)) {
+          // `hide_topic` and `hide_author` remove candidates, so the deck in hand is now
+          // partly made of exactly what the reader asked to see less of. Rebuilding it is
+          // the only way the request takes effect on cards already fetched.
+          dispatch({ type: 'reset' });
+          void loadPage(null, { allowCache: false });
+        }
+        return response.action.id;
+      } catch {
+        // Reported by the caller rather than swallowed: a control that silently fails is
+        // one the reader keeps pressing.
+        return null;
+      }
+    },
+    [api, loadPage],
+  );
+
   // Memoised, because a screen that lists this object in an effect's dependencies would
   // otherwise re-run that effect on every render — and the effect on the Discover screen
   // records an impression, so it dispatched, re-rendered, and dispatched again.
@@ -182,7 +211,8 @@ export function useDeck(): DeckController {
       dismissUndo,
       noteImpression,
       reload,
+      sendFeedback,
     }),
-    [state, act, undo, dismissUndo, noteImpression, reload],
+    [state, act, undo, dismissUndo, noteImpression, reload, sendFeedback],
   );
 }

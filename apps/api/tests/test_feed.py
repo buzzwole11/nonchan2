@@ -21,9 +21,12 @@ from papermatch_api.models import (
 )
 from papermatch_api.services import activity
 from papermatch_api.services.feed import (
+    NUDGE_ACTIONS,
+    NUDGE_STRENGTH,
     POOL_ALLOCATION,
     FeedCursor,
     build_feed,
+    feedback_nudges,
     mix_pattern,
     reason_text,
     reinjectable_paper_ids,
@@ -298,6 +301,137 @@ def test_suppression_expires_after_the_window(seeded_db: Session, user: User) ->
     action.created_at = datetime.now(tz=UTC) - timedelta(days=90)
     seeded_db.flush()
     assert suppressed_field_ids(seeded_db, user) == set()
+
+
+# ---------------------------------------------------------------------- feed feedback
+
+
+def _press(session: Session, user: User, action_type: str, times: int = 1) -> list[Action]:
+    return [
+        activity.record_action(session, user, action_type=action_type, paper_id=None, payload={})
+        for _ in range(times)
+    ]
+
+
+def test_every_nudge_action_has_a_strength_or_is_the_documented_exception() -> None:
+    """A fourth control added to `NUDGE_ACTIONS` without a strength would be counted,
+    reported as a nudge, and then do nothing. `less_similar` is absent on purpose: it is a
+    multiplier on a penalty the scorer already computed, not a flat addition."""
+    assert set(NUDGE_STRENGTH) | {"less_similar"} == set(NUDGE_ACTIONS)
+
+
+def test_an_untouched_feed_carries_no_nudge_terms(seeded_db: Session, user: User) -> None:
+    """A reader who has pressed nothing must be scored exactly as before these existed."""
+    _set_interests(seeded_db, user, ["hep-th", "cs.LG"])
+    assert feedback_nudges(seeded_db, user) == {
+        "less_similar": 0.0,
+        "more_experimental": 0.0,
+        "more_classic": 0.0,
+    }
+    for item in build_feed(seeded_db, user, limit=10).items:
+        assert not set(item.breakdown) & set(NUDGE_ACTIONS)
+
+
+def test_a_nudge_saturates_rather_than_accumulating(seeded_db: Session, user: User) -> None:
+    """Section 16: 否定的フィードバックを「嫌い」と決めつけない. A control that could be
+    pressed twenty times into a permanent ban would be exactly that."""
+    _press(seeded_db, user, "more_classic", times=3)
+    at_three = feedback_nudges(seeded_db, user)["more_classic"]
+    _press(seeded_db, user, "more_classic", times=17)
+    at_twenty = feedback_nudges(seeded_db, user)["more_classic"]
+
+    assert at_three == at_twenty == 1.0
+
+
+def test_asking_for_classic_papers_lifts_them(seeded_db: Session, user: User) -> None:
+    _set_interests(seeded_db, user, ["hep-th", "cs.LG"])
+    # A fixed cursor pins the snapshot seed. Without it the two calls draw different
+    # exploration jitter and every exploration card looks like the nudge moved it.
+    frozen = FeedCursor(seed=7, offset=0).encode()
+    before = {
+        i.paper.id: i.score for i in build_feed(seeded_db, user, limit=60, cursor=frozen).items
+    }
+
+    _press(seeded_db, user, "more_classic", times=3)
+    after = build_feed(seeded_db, user, limit=60, cursor=frozen).items
+
+    lifted = [i for i in after if "more_classic" in i.breakdown]
+    assert lifted, "expected some classic or old papers in the deck"
+    for item in lifted:
+        assert item.breakdown["more_classic"] > 0
+        assert item.score > before[item.paper.id]
+    # Everything else is left exactly where it was — a nudge lifts what was asked for, it
+    # does not push down what was not.
+    for item in after:
+        if "more_classic" not in item.breakdown:
+            assert item.score == pytest.approx(before[item.paper.id])
+
+
+def test_asking_for_fewer_similar_papers_deepens_the_penalty(
+    seeded_db: Session, user: User
+) -> None:
+    _set_interests(seeded_db, user, ["hep-th", "cs.LG"])
+    shown = build_feed(seeded_db, user, limit=1).items[0].paper
+    _show(seeded_db, user, shown)
+
+    plain = {
+        i.paper.id: i.breakdown["similarity_penalty"]
+        for i in build_feed(seeded_db, user, limit=60).items
+    }
+    _press(seeded_db, user, "less_similar", times=3)
+    nudged = build_feed(seeded_db, user, limit=60).items
+
+    moved = [i for i in nudged if "less_similar" in i.breakdown]
+    assert moved, "expected the penalty to be non-zero for something after showing a card"
+    for item in moved:
+        # A multiplier on the penalty already computed, so at full strength it doubles it.
+        assert item.breakdown["less_similar"] < 0
+        assert item.breakdown["less_similar"] == pytest.approx(plain[item.paper.id], abs=1e-4)
+
+    # A paper resembling nothing the reader saw carries no term at all — there is nothing
+    # there to suppress, and a flat penalty would punish every card for the sin of a few.
+    untouched = [i for i in nudged if plain.get(i.paper.id) == 0.0]
+    assert untouched
+    assert all("less_similar" not in i.breakdown for i in untouched)
+
+
+def test_undoing_a_nudge_removes_its_effect(seeded_db: Session, user: User) -> None:
+    """Same mechanism as the suppressions: the query counts only actions not undone."""
+    actions = _press(seeded_db, user, "more_experimental", times=2)
+    assert feedback_nudges(seeded_db, user)["more_experimental"] > 0
+
+    for action in actions:
+        activity.undo_action(seeded_db, user, action.id)
+    assert feedback_nudges(seeded_db, user)["more_experimental"] == 0.0
+
+
+def test_a_nudge_expires_with_the_same_window_as_a_suppression(
+    seeded_db: Session, user: User
+) -> None:
+    actions = _press(seeded_db, user, "more_experimental", times=3)
+    for action in actions:
+        action.created_at = datetime.now(tz=UTC) - timedelta(days=90)
+    seeded_db.flush()
+    assert feedback_nudges(seeded_db, user)["more_experimental"] == 0.0
+
+
+def test_undoing_a_nudge_does_not_resurrect_the_card_it_was_sent_from(
+    seeded_db: Session, user: User
+) -> None:
+    """実験系を増やす asks for a different mix, not for this paper back. Bringing a card the
+    reader had already moved past back into the deck would be a change they did not ask for.
+    """
+    _set_interests(seeded_db, user, ["hep-th", "cs.LG"])
+    card = build_feed(seeded_db, user, limit=1).items[0].paper
+    _show(seeded_db, user, card)
+    assert card.id not in {i.paper.id for i in build_feed(seeded_db, user, limit=60).items}
+
+    action = activity.record_action(
+        seeded_db, user, action_type="more_experimental", paper_id=card.id, payload={}
+    )
+    activity.undo_action(seeded_db, user, action.id)
+
+    assert card.id not in {i.paper.id for i in build_feed(seeded_db, user, limit=60).items}
 
 
 # ------------------------------------------------------------------------ re-injection

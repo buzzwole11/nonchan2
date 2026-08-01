@@ -16,9 +16,11 @@ import { PressableRow } from '../../src/components/PressableRow';
 import { Text } from '../../src/components/Text';
 import { AbstractCard } from '../../src/discover/AbstractCard';
 import { ActionBar } from '../../src/discover/ActionBar';
+import { FeedbackSheet, type FeedbackStatus } from '../../src/discover/FeedbackSheet';
 import { SwipeDeck } from '../../src/discover/SwipeDeck';
 import { UndoToast } from '../../src/discover/UndoToast';
 import type { SwipeDirection } from '../../src/discover/deck';
+import type { FeedbackControl } from '../../src/discover/feedback';
 import { useDeck } from '../../src/discover/useDeck';
 import { type MessageKey, translate } from '../../src/i18n';
 import { TranslationSheet } from '../../src/reading/TranslationSheet';
@@ -37,6 +39,8 @@ export default function DiscoverScreen() {
   const { user } = useSession();
   const deck = useDeck();
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackStatus, setFeedbackStatus] = useState<FeedbackStatus>({ kind: 'idle' });
 
   // The selection belongs to the paper it was made on, so it carries that paper's id and
   // is derived away when the card changes. Clearing it in an effect instead — which is
@@ -100,6 +104,21 @@ export default function DiscoverScreen() {
     [current, deck, openSource],
   );
 
+  const { sendFeedback } = deck;
+  const handleFeedback = useCallback(
+    async (control: FeedbackControl) => {
+      setFeedbackStatus({ kind: 'sending', control: control.kind });
+      const actionId = await sendFeedback(control);
+      setFeedbackStatus(
+        actionId === null ? { kind: 'failed' } : { kind: 'applied', control: control.kind },
+      );
+      // The sheet stays open on purpose. Section 16's controls are things a reader reaches
+      // for together — "less of this topic, and more classic work" is one thought — and
+      // closing after each tap would make the second one a second trip.
+    },
+    [sendFeedback],
+  );
+
   const selectionOffsets = useMemo(() => {
     if (current === null || selection === null) return null;
     return rangeToSelection(
@@ -132,9 +151,25 @@ export default function DiscoverScreen() {
           gap: theme.spacing.xs,
         }}
       >
-        <Text variant="label" accessibilityRole="header">
-          {t('discover.title')}
-        </Text>
+        <View style={styles.headerRow}>
+          <Text variant="label" accessibilityRole="header">
+            {t('discover.title')}
+          </Text>
+          {/* Section 16's feed controls need a way in that is not a gesture and not buried
+              in Settings — the reader forms the opinion while looking at a card. */}
+          <PressableRow
+            onPress={() => {
+              setFeedbackStatus({ kind: 'idle' });
+              setFeedbackOpen(true);
+            }}
+            accessibilityLabel={t('feedback.open')}
+            style={styles.headerButton}
+          >
+            <Text variant="caption" tone="accent">
+              {t('feedback.open')}
+            </Text>
+          </PressableRow>
+        </View>
         {banner !== null && (
           <Text variant="caption" tone="warning" accessibilityLiveRegion="polite">
             {banner}
@@ -215,6 +250,15 @@ export default function DiscoverScreen() {
         />
       </View>
 
+      <FeedbackSheet
+        visible={feedbackOpen}
+        locale={locale}
+        item={current}
+        status={feedbackStatus}
+        onSend={(control) => void handleFeedback(control)}
+        onClose={() => setFeedbackOpen(false)}
+      />
+
       {current !== null && (
         <TranslationSheet
           visible={sheetOpen && selectionOffsets !== null}
@@ -233,6 +277,15 @@ export default function DiscoverScreen() {
 }
 
 const styles = StyleSheet.create({
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerButton: {
+    // The row default is a full-width block; in the header it sits beside the title.
+    paddingVertical: 4,
+  },
   deckArea: {
     flex: 1,
   },

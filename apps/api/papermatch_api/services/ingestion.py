@@ -32,6 +32,7 @@ from papermatch_api.models import (
 )
 from papermatch_api.providers.base import PaperProvider, PaperQuery, PaperRecord
 from papermatch_api.services.embeddings import store_paper_embedding
+from papermatch_api.services.method_kind import classify_method_kind
 from papermatch_api.services.structure import classify
 from papermatch_api.text.dedup import compute_identity
 from papermatch_api.text.normalize import normalize_title
@@ -149,6 +150,29 @@ def _apply_field_weights(session: Session, paper: Paper, record: PaperRecord) ->
             session.add(PaperField(paper_id=paper.id, field_id=field_id, weight=float(weight)))
 
 
+#: Labels this module owns. A provider that supplies one of them is believed; otherwise the
+#: classifier fills it in. Kept as a set so re-ingesting cannot accumulate both.
+METHOD_KIND_TYPES = frozenset({"theoretical", "experimental", "review"})
+
+
+def _apply_method_kind(paper: Paper) -> None:
+    """Tag the paper theoretical / experimental / review when the abstract says so.
+
+    Section 16 balances the feed on this axis and offers a 「実験系を増やす」 button, but no
+    provider publishes it. The classifier abstains when the abstract is not clear, and an
+    abstention *removes* any label a previous run left behind rather than keeping a stale
+    one — a v2 abstract that dropped the experimental section should drop the label with it.
+    """
+    kept = [t for t in (paper.paper_types or []) if t not in METHOD_KIND_TYPES]
+    # A provider that says "review" outright outranks the classifier; that is metadata,
+    # not a guess about prose.
+    if "review" in (paper.paper_types or []):
+        paper.paper_types = [*kept, "review"]
+        return
+    kind = classify_method_kind(paper.title, paper.abstract)
+    paper.paper_types = [*kept, kind] if kind else kept
+
+
 def _apply_segments(session: Session, paper: Paper, raw: dict[str, Any]) -> None:
     """Store the abstract's structure, from the source when it has one.
 
@@ -254,6 +278,7 @@ def upsert_record(session: Session, record: PaperRecord) -> tuple[Paper, str]:
 
     _apply_identifiers(session, paper, record)
     _apply_field_weights(session, paper, record)
+    _apply_method_kind(paper)
     _apply_segments(session, paper, record.raw)
     session.flush()
     # After the flush, because the vector is keyed on the paper's id. Embedding at
