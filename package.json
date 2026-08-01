@@ -35,5 +35,8 @@
     "prettier": "^3.9.6",
     "typescript": "^5.6.3",
     "typescript-eslint": "^8.65.0"
+  },
+  "overrides": {
+    "react-native-worklets": "0.10.1"
   }
 }
