@@ -35,7 +35,7 @@ describe('sentenceRuns', () => {
   });
 
   it('keeps the sentence index, because that is what a tap reports back', () => {
-    expect(sentenceRuns([{ index: 7, text: 'Only one.' }])[0].index).toBe(7);
+    expect(sentenceRuns([{ index: 7, text: 'Only one.' }])[0]?.index).toBe(7);
   });
 });
 
@@ -69,7 +69,9 @@ describe('the document', () => {
       html.indexOf('</script>'),
     );
     const parsed = JSON.parse(payload) as { sentences: { runs: { value: string }[] }[] };
-    const rebuilt = parsed.sentences[0].runs
+    const first = parsed.sentences[0];
+    expect(first).toBeDefined();
+    const rebuilt = (first?.runs ?? [])
       .map((run, i) => (i % 2 === 1 ? `$${run.value}$` : run.value))
       .join('');
     expect(rebuilt).toBe(text);

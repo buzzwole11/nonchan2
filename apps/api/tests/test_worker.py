@@ -35,6 +35,14 @@ pytestmark = [pytest.mark.integration, requires_db]
 
 NOW = datetime(2026, 8, 1, tzinfo=UTC)
 
+#: These tests run against `seeded_db`, which already holds the 60-paper sample corpus —
+#: and the refresh queue is "every paper from this source". They stay isolated because the
+#: sample corpus is all `source_provider="mock"` while these records are `"arxiv"`, so the
+#: queue only ever contains the paper the test just ingested. Load-bearing and easy to
+#: break from the other end: change the fixtures to another provider and these tests start
+#: seeing sixty papers they did not put there. `counts["missing"] == 1` below is what
+#: notices if that ever happens.
+
 
 def record(canonical_id: str, **overrides: object) -> PaperRecord:
     base = PaperRecord(
