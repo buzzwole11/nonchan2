@@ -4,7 +4,7 @@
 
 完全な企画・技術仕様は [`PaperMatch_SPEC.md`](./PaperMatch_SPEC.md) にあります。この README は、いま何が動くのか、どう動かすのかだけを書いています。
 
-**現在の状態: Phase 0 完了 / Phase 1 は 1-A〜1-D 完了（実 API への疎通と E2E は残）/ Phase 2 は AI 非依存部分が完了 / Phase 4 は 4-A・4-B 完了（4-B の WebView は実機確認待ち）。** 実装フェーズの全体像は [`TASKS.md`](./TASKS.md)、設計上の判断とその理由は [`DECISIONS.md`](./DECISIONS.md)、構成の説明は [`ARCHITECTURE.md`](./ARCHITECTURE.md) を参照してください。
+**現在の状態: Phase 0 完了 / Phase 1 は 1-A〜1-D 完了（実 API への疎通と E2E は残）/ Phase 2 は AI 非依存部分が完了 / Phase 4 は 4-A〜4-C 完了（WebView の実機確認は保留）。** 実装フェーズの全体像は [`TASKS.md`](./TASKS.md)、設計上の判断とその理由は [`DECISIONS.md`](./DECISIONS.md)、構成の説明は [`ARCHITECTURE.md`](./ARCHITECTURE.md) を参照してください。
 
 ---
 
@@ -44,6 +44,9 @@
 - **未検証の変形は既定で非表示**（仕様書 12 節）。ただし隠した件数は返すので、導出が完全であるかのようには見えません。
 - **KaTeX をアプリに同梱** — CDN は使いません（オフライン動作と仕様書 25 節）。数式は `<script type="application/json">` に入れて渡し、**HTML へ文字列結合しません** — `</script>` を含む数式は WebView でのスクリプト実行になるからです。サーバの拒否・KaTeX の `trust: false`・CSP とナビゲーション拒否の 3 重で止めています（[`DECISIONS.md`](./DECISIONS.md) D-029）。
 - **MathML 併記**とスクリーンリーダー用ラベル、Dynamic Type、ライト/ダーク、失敗時の LaTeX ソース表示。実ブラウザで、同梱コーパス 18 本すべての組版・注入スクリプトが走らないこと・**ネットワークリクエスト 0 件**を確認しています。
+- **Focus Mode**（`/math/[id]`、Learn タブから）— 記号 / 構造 / 導出 / 意味 / 極限 の 5 タブ。詳細度は 4 段階ありますが、選ぶのは「説明の量」ではなく**カードが持っている導出の量**です。どのレベルも保存されていない step を作りません（[`DECISIONS.md`](./DECISIONS.md) D-031）。
+- **理解チェック**はカードの導出から組み立てます（AI 生成ではありません）。誤答の選択肢は同じカードの他の操作なので、「ここで効くのはどれか」を分かっている必要があります。結果は文だけで、点数は出しません。
+- **極限タブ**は各変形が実際に確認された範囲と次元を出し、「ここに書かれていない範囲については何も主張していません」と添えます。
 
 ```bash
 curl -s localhost:8000/math-cards | jq '.cards[] | {cardType, title}'
@@ -85,7 +88,7 @@ Markdown と手で整えた JSON は Prettier の対象外です（`.prettierign
 
 ### まだ無いもの
 
-Focus Mode（Phase 4-C: 記号 / 構造 / 導出 / 意味 / 極限 のタブ、詳細度スライダー、理解チェック）、取り込み worker（定期実行、撤回・版更新の同期）と実 API への疎通確認（上記 `-m live`、この環境では実行不可 — [`DECISIONS.md`](./DECISIONS.md) D-016）、実翻訳 Provider と AI 説明（同じくネットワーク制約 — D-024）、Maestro による E2E、Knowledge Canvas。着手順は [`TASKS.md`](./TASKS.md) にあります。
+取り込み worker（定期実行、撤回・版更新の同期）と実 API への疎通確認（上記 `-m live`、この環境では実行不可 — [`DECISIONS.md`](./DECISIONS.md) D-016）、実翻訳 Provider と AI 説明（同じくネットワーク制約 — D-024）、Maestro による E2E、Knowledge Canvas。着手順は [`TASKS.md`](./TASKS.md) にあります。
 
 ---
 
@@ -168,7 +171,7 @@ make format      # 両言語の自動整形
 
 DB が無い環境では統合テストと E2E テストは失敗ではなく **skip** され、起動方法が理由に表示されます。
 
-現在: Python 449 件 / TypeScript 105 件。
+現在: Python 449 件 / TypeScript 131 件。
 
 | 種別 | 対象 |
 | --- | --- |

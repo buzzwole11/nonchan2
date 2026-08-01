@@ -9,11 +9,12 @@
  * into a reading exercise, and the reason an expression is here at all is that someone
  * wanted to remember it.
  */
+import { Link } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { ExpressionCard, ReviewOutcome } from '@papermatch/shared-types';
+import type { ExpressionCard, MathCardView, ReviewOutcome } from '@papermatch/shared-types';
 
 import { useSession } from '../../src/api/session';
 import { Chip } from '../../src/components/Chip';
@@ -237,6 +238,8 @@ export default function LearnScreen() {
           ))
         )}
       </View>
+
+      <MathCards locale={locale} />
     </ScrollView>
   );
 }
@@ -246,3 +249,54 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
 });
+
+/**
+ * Maths cards, reachable from Learn.
+ *
+ * Spec section 10 lists four ways into a card and this is the one that needs nothing else
+ * built first: 保存した論文に数式カードがある場合に通知 needs notifications, the Discover
+ * mix needs the recommender, and the Canvas tile needs the Canvas. Learn already exists
+ * and is where a reader goes to revisit something.
+ */
+function MathCards({ locale }: { locale: 'ja' | 'en' }) {
+  const theme = useTheme();
+  const { api } = useSession();
+  const [cards, setCards] = useState<MathCardView[] | null>(null);
+  const t = (key: MessageKey, params?: Record<string, string | number>) =>
+    translate(locale, key, params);
+
+  const load = useCallback(async () => {
+    try {
+      setCards((await api.mathCards({ limit: 20 })).cards);
+    } catch {
+      setCards([]);
+    }
+  }, [api]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on mount; see DECISIONS.md D-026
+    void load();
+  }, [load]);
+
+  if (cards === null || cards.length === 0) return null;
+
+  return (
+    <View style={{ gap: theme.spacing.sm, marginTop: theme.spacing.xl }}>
+      <Text variant="label" accessibilityRole="header">
+        {t('learn.mathCards')}
+      </Text>
+      {cards.map((card) => (
+        <Link key={card.id} href={`/math/${card.id}`} asChild>
+          <PressableRow accessibilityLabel={card.title}>
+            <View style={{ gap: theme.spacing.xs }}>
+              <Text variant="caption" tone="secondary">
+                {t(`mathCardType.${card.cardType}` as MessageKey)}
+              </Text>
+              <Text>{card.title}</Text>
+            </View>
+          </PressableRow>
+        </Link>
+      ))}
+    </View>
+  );
+}

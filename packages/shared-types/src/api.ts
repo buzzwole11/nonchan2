@@ -15,15 +15,20 @@ import type {
   Translation,
   User,
   UserSettings,
+  Uuid,
 } from './models.ts';
 import type {
   ActionType,
   ExpressionKind,
+  MathCardType,
+  MathLevel,
+  ProvenanceKind,
   ReviewOutcome,
   SaveReason,
   SavedStatus,
   TranslationStage,
   TranslationStyle,
+  VerificationStatus,
 } from './vocab.ts';
 
 /** Uniform error body for every non-2xx response. */
@@ -230,4 +235,79 @@ export interface HealthResponse {
   /** Per-provider health so the client can explain a degraded feed. */
   providers: Record<string, { healthy: boolean; detail?: string }>;
   database: { connected: boolean; migrationRevision: string | null };
+}
+
+// ------------------------------------------------------------------------- equations
+
+/**
+ * An equation as the API sends it (spec sections 11, 24).
+ *
+ * Wider than the stored `Equation`: the server decides whether a formula may be handed to
+ * the renderer and says so here, because spec section 25 keeps that judgement off the
+ * client. `latex` is present either way — a refused formula is shown as source, which is
+ * section 11's documented fallback, so refusing to typeset is not refusing to send.
+ */
+export interface EquationView {
+  id: Uuid;
+  paperId: Uuid;
+  latex: string;
+  equationNumber: string | null;
+  section: string | null;
+  display: boolean;
+  provenanceKind: ProvenanceKind;
+  verificationStatus: VerificationStatus;
+  renderable: boolean;
+  refusalReasons: string[];
+  symbols: EquationSymbolView[];
+}
+
+export interface EquationSymbolView {
+  symbol: string;
+  localMeaning: string;
+  generalMeaning: string | null;
+  unit: string | null;
+  scope: 'equation' | 'section' | 'paper' | 'field';
+  provenanceKind: ProvenanceKind;
+}
+
+export interface DerivationStepView {
+  id: Uuid;
+  fromEquationId: Uuid;
+  toEquationId: Uuid;
+  latex: string;
+  operation: string;
+  rationale: string;
+  verificationStatus: VerificationStatus;
+  provenanceKind: ProvenanceKind;
+  renderable: boolean;
+  /** What the checks concluded, so a status can be explained rather than asserted. */
+  evidence: Record<string, unknown> | null;
+}
+
+export interface MathCardView {
+  id: Uuid;
+  cardType: MathCardType;
+  title: string;
+  level: MathLevel;
+  reviewStatus: 'draft' | 'in_review' | 'approved' | 'rejected';
+  provenanceKind: ProvenanceKind;
+  body: { summary?: string; whyItMatters?: string } & Record<string, unknown>;
+}
+
+export interface MathCardListResponse {
+  cards: MathCardView[];
+  total: number;
+}
+
+export interface MathCardDetailResponse {
+  card: MathCardView;
+  equations: EquationView[];
+  steps: DerivationStepView[];
+  /** Withheld because no check passed (spec section 12), reported so the derivation
+   *  cannot look complete when it is not. */
+  hiddenStepCount: number;
+}
+
+export interface EquationListResponse {
+  equations: EquationView[];
 }

@@ -14,23 +14,25 @@ import type {
   AuthTokenResponse,
   CreateActionRequest,
   CreateExpressionRequest,
+  CreateImpressionsRequest,
+  CreateImpressionsResponse,
   CreateTranslationRequest,
   CreateTranslationResponse,
   ExpressionListResponse,
   ExpressionResponse,
-  CreateImpressionsRequest,
-  CreateImpressionsResponse,
   FeedResponse,
   FieldsResponse,
   HealthResponse,
   Interest,
+  MathCardDetailResponse,
+  MathCardListResponse,
   PaperListResponse,
+  ReviewOutcome,
+  ReviewQueueResponse,
   SavePaperRequest,
   SavedListQuery,
   SavedListResponse,
   SavedPaperResponse,
-  ReviewOutcome,
-  ReviewQueueResponse,
   UndoResponse,
   UpdateSavedRequest,
   User,
@@ -253,6 +255,25 @@ export class ApiClient {
 
   removeSaved(paperId: string): Promise<void> {
     return this.request<void>(`/saved/${paperId}`, { method: 'DELETE' });
+  }
+
+  // -- maths ---------------------------------------------------------------------
+
+  mathCards(query: { cardType?: string; limit?: number } = {}): Promise<MathCardListResponse> {
+    return this.request<MathCardListResponse>('/math-cards', {
+      query: { cardType: query.cardType, limit: query.limit },
+    });
+  }
+
+  /**
+   * One card with everything Focus Mode needs.
+   *
+   * `includeUnverified` is left off: spec section 12 hides transformations that passed no
+   * check, and the response says how many were withheld so the screen can be honest about
+   * the derivation being incomplete rather than silently short.
+   */
+  mathCard(cardId: string): Promise<MathCardDetailResponse> {
+    return this.request<MathCardDetailResponse>(`/math-cards/${cardId}`);
   }
 
   // -- learn ---------------------------------------------------------------------
