@@ -5,6 +5,7 @@
  * revisit is a trap — plus the accessibility switches from section 20 and the data
  * controls from section 25.
  */
+import { Link } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -177,6 +178,19 @@ export default function ProfileScreen() {
           {t('status.fontScale')}: ×{theme.fontScale.toFixed(2)}
         </Text>
       </Section>
+
+      {/* `__DEV__` is false in a production build, so this never ships. The same screen is
+          reachable from the offline entry screen, which is where someone lands when they
+          are checking the renderer without a database running. */}
+      {__DEV__ && (
+        <Section title="開発用">
+          <Link href="/dev/math" asChild>
+            <PressableRow accessibilityLabel="数式レンダラの確認">
+              <Text tone="accent">数式レンダラの確認 →</Text>
+            </PressableRow>
+          </Link>
+        </Section>
+      )}
 
       <Section title={t('profile.data')}>
         <PressableRow

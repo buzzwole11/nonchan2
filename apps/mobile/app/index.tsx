@@ -5,7 +5,7 @@
  * everyone else to the deck. Spec section 4 puts the first card close, so this screen is
  * a redirect with a spinner, never a landing page.
  */
-import { Redirect } from 'expo-router';
+import { Link, Redirect } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 
 import { useSession } from '../src/api/session';
@@ -56,10 +56,34 @@ export default function Entry() {
         <PressableRow onPress={retry} accessibilityLabel={translate('ja', 'common.retry')}>
           <Text tone="accent">{translate('ja', 'common.retry')}</Text>
         </PressableRow>
+        <DevMathLink />
       </View>
     );
   }
 
   const needsOnboarding = user !== null && user.interests.length === 0;
   return <Redirect href={needsOnboarding ? '/onboarding/fields' : '/(tabs)'} />;
+}
+
+/**
+ * A way into the formula-renderer check screen (`/dev/math`).
+ *
+ * Placed on the offline branch on purpose: that screen needs no API and no database, so
+ * it is exactly what someone sees when they have cloned the repository to try the
+ * renderer on a device without standing up Postgres first.
+ *
+ * `__DEV__` is false in a production build, so this never ships.
+ */
+function DevMathLink() {
+  const theme = useTheme();
+  if (!__DEV__) return null;
+  return (
+    <Link href="/dev/math" asChild>
+      <PressableRow accessibilityLabel="開発用: 数式レンダラの確認">
+        <Text tone="secondary" style={{ color: theme.color.textSecondary }}>
+          開発用: 数式レンダラの確認 →
+        </Text>
+      </PressableRow>
+    </Link>
+  );
 }
