@@ -158,6 +158,10 @@ AI が要る項目は環境制約で未着手です（DECISIONS.md D-024）。
 - [x] API — `GET /papers/{id}/equations`、`GET /math-cards`、`GET /math-cards/{id}`
 
 ### 4-B レンダリング — 文書生成は完了。WebView 統合は実機確認待ち
+- [x] **Abstract のインライン数式を組版**（`src/math/abstractDocument.ts`、`src/discover/AbstractBody.tsx`）—
+      カード 1 枚につき文書 1 つ。文はタップ対象のまま、式ごとにレンダラを置かない。
+      web は blob URL の iframe（`srcdoc` は CSP でスクリプトが走らない）。
+      平文の経路はフォールバックとして残す（DECISIONS.md D-035）
 - [x] **KaTeX をアプリに同梱**（`katexRuntime.ts`、woff2 20 面をデータ URI 化。ネットワーク 0 件を実測）
 - [x] **数式をデータとしてのみ渡す** — `</script>` を含む式でも注入スクリプトが走らないことを実ブラウザで確認（DECISIONS.md D-029）
 - [x] **MathML 併記**（`htmlAndMathml`）と、視覚側の `aria-hidden` — 同じ式を 2 回読み上げさせない

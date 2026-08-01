@@ -76,6 +76,89 @@ function insideMath(text: string, offset: number): boolean {
   return open;
 }
 
+/** One piece of a sentence: prose, or a formula to typeset. */
+export interface TextRun {
+  kind: 'text' | 'math';
+  /** For `math`, the LaTeX *without* its `$` delimiters — what KaTeX is given. */
+  value: string;
+  /** True when the run was written as `$$...$$`, which KaTeX renders on its own line. */
+  display?: boolean;
+}
+
+/**
+ * Split a sentence into prose and formulas (spec section 11).
+ *
+ * The abstract is the one place where maths arrives mixed into running text, and until this
+ * existed the card printed `$\mathbb{P}(|f - \mathbb{E}f| > t)$` in the middle of a
+ * sentence — section 11 makes the LaTeX source the *fallback* for a formula that cannot be
+ * typeset, not the normal presentation.
+ *
+ * An unclosed `$` is treated as prose rather than as an opening delimiter. A stray dollar
+ * sign in an abstract is far more likely to be a price or a typo than the start of a formula
+ * that runs to the end of the text, and guessing the other way would swallow the rest of the
+ * sentence into a formula that then fails to parse.
+ */
+export function splitMathRuns(text: string): TextRun[] {
+  const runs: TextRun[] = [];
+  let prose = '';
+  let i = 0;
+
+  const flushProse = () => {
+    if (prose !== '') {
+      runs.push({ kind: 'text', value: prose });
+      prose = '';
+    }
+  };
+
+  while (i < text.length) {
+    const char = text[i];
+
+    // An escaped dollar is a literal one and never opens a formula.
+    if (char === '\\' && text[i + 1] === '$') {
+      prose += '$';
+      i += 2;
+      continue;
+    }
+
+    if (char === '$') {
+      const display = text[i + 1] === '$';
+      const delimiter = display ? '$$' : '$';
+      const closed = findClosing(text, i + delimiter.length, delimiter);
+      if (closed === -1) {
+        prose += char;
+        i += 1;
+        continue;
+      }
+      const latex = text.slice(i + delimiter.length, closed).trim();
+      if (latex !== '') {
+        flushProse();
+        runs.push({ kind: 'math', value: latex, display });
+      }
+      i = closed + delimiter.length;
+      continue;
+    }
+
+    prose += char;
+    i += 1;
+  }
+
+  flushProse();
+  return runs;
+}
+
+function findClosing(text: string, from: number, delimiter: string): number {
+  let i = from;
+  while (i < text.length) {
+    if (text[i] === '\\') {
+      i += 2;
+      continue;
+    }
+    if (text.startsWith(delimiter, i)) return i;
+    i += 1;
+  }
+  return -1;
+}
+
 /**
  * Split an abstract into sentences with exact offsets.
  *

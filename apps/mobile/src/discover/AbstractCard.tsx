@@ -16,8 +16,9 @@ import type { FeedItem, Paper } from '@papermatch/shared-types';
 
 import { Chip } from '../components/Chip';
 import { Text } from '../components/Text';
+import { AbstractBody } from './AbstractBody';
 import { type MessageKey, translate } from '../i18n';
-import { type SelectionRange, isSelected, splitSentences } from '../reading/sentences';
+import { type SelectionRange, splitSentences } from '../reading/sentences';
 import { useTheme } from '../theme/ThemeProvider';
 
 export interface AbstractCardProps {
@@ -146,43 +147,20 @@ export function AbstractCard({
           {t('discover.tapToTranslate')}
         </Text>
         {/*
-          Nested <Text>, not a row of Pressables.
+          One document for the whole abstract, not a component per sentence.
 
-          Sentences have to flow into one paragraph and wrap at the card edge. Laid out as
-          separate flex children they each became one unwrappable line, and the abstract —
-          the body of the card in spec section 6 — was clipped after about forty
-          characters. Nested text is the only structure that gives per-sentence tap
-          targets *and* ordinary line breaking; each child keeps its own accessibility
-          role and label, so every sentence is still reachable individually.
+          Sentences have to flow into one paragraph, wrap at the card edge, stay
+          individually tappable (spec section 7 selects whole sentences), and typeset the
+          formulas inside them (section 11). `AbstractBody` does all four and falls back to
+          plain text if its renderer never reports in.
         */}
-        <Text variant="abstract">
-          {sentences.map((sentence) => {
-            const active = isSelected(selection, sentence.index);
-            return (
-              <Text
-                key={sentence.index}
-                variant="abstract"
-                onPress={behind ? undefined : () => onSelectSentence(sentence.index)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={sentence.text}
-                accessibilityHint={t('discover.tapToTranslate')}
-                style={
-                  active
-                    ? {
-                        // Tint *and* underline: the selection has to survive greyscale
-                        // and colour-blindness (spec section 20).
-                        backgroundColor: theme.color.translationSurface,
-                        textDecorationLine: 'underline',
-                      }
-                    : undefined
-                }
-              >
-                {sentence.text}{' '}
-              </Text>
-            );
-          })}
-        </Text>
+        <AbstractBody
+          sentences={sentences}
+          selection={selection}
+          locale={locale}
+          onSelectSentence={onSelectSentence}
+          behind={behind}
+        />
       </ScrollView>
 
       {/* -- footer ------------------------------------------------------------- */}
