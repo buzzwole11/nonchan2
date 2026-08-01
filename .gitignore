@@ -33,3 +33,7 @@ coverage.xml
 # Local data
 *.sqlite3
 /tmp-artifacts/
+
+# Written by `expo start` if it is ever run from the repository root by mistake. The
+# workspaces extend tsconfig.base.json; a root tsconfig.json here is litter, not config.
+/tsconfig.json
