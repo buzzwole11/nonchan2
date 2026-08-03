@@ -9,13 +9,15 @@
  * into a reading exercise, and the reason an expression is here at all is that someone
  * wanted to remember it.
  */
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { ExpressionCard, MathCardView, ReviewOutcome } from '@papermatch/shared-types';
+import type { ReviewOutcome } from '@papermatch/shared-types';
 
+import { learnQuery, mathCardsQuery, queryKeys } from '../../src/api/queries';
 import { useSession } from '../../src/api/session';
 import { Chip } from '../../src/components/Chip';
 import { PressableRow } from '../../src/components/PressableRow';
@@ -28,36 +30,25 @@ export default function LearnScreen() {
   const insets = useSafeAreaInsets();
   const { api, user } = useSession();
 
-  const [due, setDue] = useState<ExpressionCard[] | null>(null);
-  const [totalDue, setTotalDue] = useState(0);
-  const [all, setAll] = useState<ExpressionCard[]>([]);
-  const [total, setTotal] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { data, isPending } = useQuery(learnQuery(api));
+  const due = isPending ? null : (data?.due ?? []);
+  const totalDue = data?.totalDue ?? 0;
+  const all = data?.expressions ?? [];
+  const total = data?.total ?? 0;
+
+  /** Edit the cached lists in place; the cache is what this screen renders from. */
+  const patch = (change: (current: NonNullable<typeof data>) => NonNullable<typeof data>) =>
+    queryClient.setQueryData<typeof data>(queryKeys.review(), (current) =>
+      current === undefined ? current : change(current),
+    );
 
   const locale: 'ja' | 'en' = (user?.settings.locale ?? 'ja').startsWith('en') ? 'en' : 'ja';
   const t = (key: MessageKey, params?: Record<string, string | number>) =>
     translate(locale, key, params);
-
-  const load = useCallback(async () => {
-    try {
-      const [queue, list] = await Promise.all([
-        api.reviewQueue(5),
-        api.expressions({ limit: 100 }),
-      ]);
-      setDue(queue.due);
-      setTotalDue(queue.totalDue);
-      setAll(list.expressions);
-      setTotal(list.total);
-    } catch {
-      setDue([]);
-    }
-  }, [api]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on mount; see DECISIONS.md D-026
-    void load();
-  }, [load]);
 
   const current = due?.[0] ?? null;
 
@@ -68,8 +59,11 @@ export default function LearnScreen() {
       await api.submitReview(current.id, outcome);
       // Drop the card locally so the next prompt appears at once, rather than making the
       // reader wait on a refetch between two one-line questions.
-      setDue((queue) => (queue ?? []).slice(1));
-      setTotalDue((n) => Math.max(0, n - 1));
+      patch((current) => ({
+        ...current,
+        due: current.due.slice(1),
+        totalDue: Math.max(0, current.totalDue - 1),
+      }));
       setRevealed(false);
     } catch {
       // Leave the card in place; the answer simply did not stick.
@@ -79,14 +73,16 @@ export default function LearnScreen() {
   }
 
   async function remove(id: string): Promise<void> {
-    const previous = all;
-    setAll((rows) => rows.filter((row) => row.id !== id));
-    setTotal((n) => Math.max(0, n - 1));
+    const previous = queryClient.getQueryData<typeof data>(queryKeys.review());
+    patch((current) => ({
+      ...current,
+      expressions: current.expressions.filter((row) => row.id !== id),
+      total: Math.max(0, current.total - 1),
+    }));
     try {
       await api.removeExpression(id);
     } catch {
-      setAll(previous);
-      setTotal(previous.length);
+      queryClient.setQueryData(queryKeys.review(), previous);
     }
   }
 
@@ -261,24 +257,12 @@ const styles = StyleSheet.create({
 function MathCards({ locale }: { locale: 'ja' | 'en' }) {
   const theme = useTheme();
   const { api } = useSession();
-  const [cards, setCards] = useState<MathCardView[] | null>(null);
   const t = (key: MessageKey, params?: Record<string, string | number>) =>
     translate(locale, key, params);
 
-  const load = useCallback(async () => {
-    try {
-      setCards((await api.mathCards({ limit: 20 })).cards);
-    } catch {
-      setCards([]);
-    }
-  }, [api]);
+  const { data: cards } = useQuery(mathCardsQuery(api));
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on mount; see DECISIONS.md D-026
-    void load();
-  }, [load]);
-
-  if (cards === null || cards.length === 0) return null;
+  if (cards === undefined || cards.length === 0) return null;
 
   return (
     <View style={{ gap: theme.spacing.sm, marginTop: theme.spacing.xl }}>

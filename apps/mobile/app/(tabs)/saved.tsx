@@ -6,74 +6,61 @@
  * graveyard, so each row shows its reading state and its save reason rather than being an
  * undifferentiated list of titles.
  */
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as WebBrowser from 'expo-web-browser';
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, FlatList, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { SAVED_SORT_KEYS, type SavedEntry, type SavedSortKey } from '@papermatch/shared-types';
+import { SAVED_SORT_KEYS, type SavedSortKey } from '@papermatch/shared-types';
 
-import { NetworkError } from '../../src/api/client';
+import { queryKeys, savedQuery } from '../../src/api/queries';
 import { useSession } from '../../src/api/session';
 import { Chip } from '../../src/components/Chip';
 import { PressableRow } from '../../src/components/PressableRow';
 import { Text } from '../../src/components/Text';
 import { type MessageKey, translate } from '../../src/i18n';
-import { cacheSaved, readCachedSaved } from '../../src/offline/cache';
 import { useTheme } from '../../src/theme/ThemeProvider';
 
 export default function SavedScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { api, user } = useSession();
-  const [entries, setEntries] = useState<SavedEntry[] | null>(null);
-  const [total, setTotal] = useState(0);
   const [sort, setSort] = useState<SavedSortKey>('recently_saved');
-  const [offline, setOffline] = useState(false);
+  const queryClient = useQueryClient();
 
   const locale: 'ja' | 'en' = (user?.settings.locale ?? 'ja').startsWith('en') ? 'en' : 'ja';
   const t = (key: MessageKey, params?: Record<string, string | number>) =>
     translate(locale, key, params);
 
-  const load = useCallback(
-    async (wanted: SavedSortKey) => {
-      setEntries(null);
-      try {
-        const response = await api.saved({ sort: wanted, limit: 50 });
-        setEntries(response.saved);
-        setTotal(response.total);
-        setOffline(false);
-        void cacheSaved(response.saved, response.total);
-      } catch (error) {
-        if (error instanceof NetworkError) {
-          const cached = await readCachedSaved();
-          setEntries(cached?.saved ?? []);
-          setTotal(cached?.total ?? 0);
-          setOffline(true);
-          return;
-        }
-        setEntries([]);
-      }
-    },
-    [api],
-  );
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on mount; see DECISIONS.md D-026
-    void load(sort);
-  }, [load, sort]);
+  // The offline fallback lives inside the query function (`savedQuery`), so the rows and
+  // the offline flag always came from the same attempt and cannot disagree for a render.
+  const { data, isPending } = useQuery(savedQuery(api, sort));
+  const entries = isPending ? null : (data?.rows.saved ?? []);
+  const total = data?.rows.total ?? 0;
+  const offline = data?.offline ?? false;
 
   async function remove(paperId: string): Promise<void> {
-    // Optimistic: the row disappears immediately and is restored if the call fails, so
-    // the list never lags behind the tap.
-    const previous = entries ?? [];
-    setEntries(previous.filter((e) => e.savedPaper.paperId !== paperId));
-    setTotal((n) => Math.max(0, n - 1));
+    // Optimistic: the row disappears immediately and is restored if the call fails, so the
+    // list never lags behind the tap. Written straight into the cache rather than into
+    // component state, because the cache is what the screen renders from now.
+    const key = queryKeys.saved(sort);
+    const previous = queryClient.getQueryData<typeof data>(key);
+    queryClient.setQueryData<typeof data>(key, (current) =>
+      current === undefined
+        ? current
+        : {
+            ...current,
+            rows: {
+              saved: current.rows.saved.filter((e) => e.savedPaper.paperId !== paperId),
+              total: Math.max(0, current.rows.total - 1),
+            },
+          },
+    );
     try {
       await api.removeSaved(paperId);
     } catch {
-      setEntries(previous);
-      setTotal(previous.length);
+      queryClient.setQueryData(key, previous);
     }
   }
 

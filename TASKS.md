@@ -92,9 +92,11 @@
 - [x] **TypeScript の lint（ESLint 9 + Prettier 3）** — `make lint` と CI の必須チェック。
       色リテラル禁止と画面間 import 禁止をプロジェクト固有ルールとして追加（DECISIONS.md D-026）
 - [x] トークンを `expo-secure-store` へ移す（DECISIONS.md D-007）
-- [ ] `saved` / `learn` / 翻訳シートのデータ取得を `@tanstack/react-query` へ移す —
-      `react-hooks/set-state-in-effect` の指摘 3 件はこれが本来の直し方（DECISIONS.md D-026）。
-      現状は行ごとの disable。オフライン時のキャッシュ・フォールバックを壊さないことが条件
+- [x] **`@tanstack/react-query` へ移行**（`src/api/queries.ts`）— `saved` / `learn` / 数式カード /
+      Focus Mode / 翻訳シートの 5 箇所。`set-state-in-effect` の行ごとの disable は全廃。
+      **オフライン時のフォールバックは queryFn の中**に置いたので、AsyncStorage キャッシュは
+      そのまま（DECISIONS.md D-040）。翻訳シートだけは query ではなく mutation
+      （`POST /translations` は行を作る書き込み）
 - [ ] Maestro による E2E（オンボーディング / スワイプ / Undo / 範囲選択翻訳 / オフライン / VoiceOver 操作）
 - [ ] Visual regression（light・dark / 小画面・大画面 / 日本語長文 / Dynamic Type / Reduce Motion）
 

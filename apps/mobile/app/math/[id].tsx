@@ -15,8 +15,9 @@
  *   evidence stored with the step. It makes no claim beyond the checks that ran.
  */
 
+import { useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -46,6 +47,7 @@ import {
   stepBetween,
   visibleSteps,
 } from '../../src/math/focus';
+import { mathCardQuery } from '../../src/api/queries';
 import { ReportSheet, type ReportStatus } from '../../src/math/ReportSheet';
 import { useTheme } from '../../src/theme/ThemeProvider';
 
@@ -55,8 +57,6 @@ export default function FocusModeScreen() {
   const insets = useSafeAreaInsets();
   const { api, user } = useSession();
 
-  const [card, setCard] = useState<MathCardDetailResponse | null>(null);
-  const [failed, setFailed] = useState(false);
   const [tab, setTab] = useState<FocusTab>('derivation');
   const [detail, setDetail] = useState<DetailLevel>('standard');
   const [reportOpen, setReportOpen] = useState(false);
@@ -68,20 +68,9 @@ export default function FocusModeScreen() {
     [locale],
   );
 
-  const load = useCallback(async () => {
-    if (typeof id !== 'string') return;
-    try {
-      setCard(await api.mathCard(id));
-      setFailed(false);
-    } catch {
-      setFailed(true);
-    }
-  }, [api, id]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on mount; see DECISIONS.md D-026
-    void load();
-  }, [load]);
+  const cardId = typeof id === 'string' ? id : '';
+  const { data: card, isError: failed, refetch } = useQuery(mathCardQuery(api, cardId));
+  const load = refetch;
 
   if (failed) {
     return (
@@ -94,7 +83,7 @@ export default function FocusModeScreen() {
     );
   }
 
-  if (card === null) {
+  if (card === undefined) {
     return (
       <Centred>
         <ActivityIndicator accessibilityLabel={t('common.loading')} color={theme.color.accent} />

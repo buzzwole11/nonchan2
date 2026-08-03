@@ -11,7 +11,8 @@
  * original because a formula could not be preserved, and a refusal because the paper's
  * terms do not permit sending its text to a provider.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, View } from 'react-native';
 
 import type { TranslationStage } from '@papermatch/shared-types';
@@ -108,48 +109,50 @@ function TranslationSheetBody({
   const theme = useTheme();
   const { api } = useSession();
   const [stage, setStage] = useState<TranslationStage>(initialStage);
-  const [state, setState] = useState<SheetState>({ kind: 'idle' });
   const [saveState, setSaveState] = useState<SaveState>({ kind: 'idle' });
   const t = (key: MessageKey, params?: Record<string, string | number>) =>
     translate(locale, key, params);
 
-  const run = useCallback(
-    async (wanted: TranslationStage) => {
-      if (selection === null) return;
-      setState({ kind: 'loading' });
-      try {
-        const response = await api.translate({
-          paperId,
-          selection: { field: 'abstract', ...selection },
-          style: 'natural',
-          stage: wanted,
-        });
-        const { translation } = response;
-        setState({
-          kind: 'ready',
-          translated: translation.translated,
-          fellBack: translation.fellBackToOriginal,
-          notice: translation.generation.model.startsWith('mock')
-            ? t('translate.mockNotice')
-            : null,
-        });
-      } catch (error) {
-        setState({ kind: 'error', messageKey: errorMessageKey(error) });
-      }
+  // A mutation, not a query: `POST /translations` stores the selection and the translation
+  // (spec section 7), so it is a write with a result rather than a cached read. That also
+  // fixes the effect this used to need — `mutate` is a call, not a setState, so firing it
+  // on mount is no longer state written from an effect.
+  const translation = useMutation({
+    mutationFn: async (wanted: TranslationStage) => {
+      if (selection === null) throw new Error('nothing selected');
+      return api.translate({
+        paperId,
+        selection: { field: 'abstract', ...selection },
+        style: 'natural',
+        stage: wanted,
+      });
     },
-    // `t` is derived from `locale`, which is in the dependency list via the closure.
-    [api, paperId, selection, locale], // eslint-disable-line react-hooks/exhaustive-deps
-  );
+  });
 
+  const { mutate } = translation;
   // Runs once per opening, because this component only exists while the sheet is open.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on mount; see DECISIONS.md D-026
-    void run(initialStage);
-  }, [initialStage, run]);
+    mutate(initialStage);
+  }, [initialStage, mutate]);
+
+  const state: SheetState = translation.isPending
+    ? { kind: 'loading' }
+    : translation.isError
+      ? { kind: 'error', messageKey: errorMessageKey(translation.error) }
+      : translation.data === undefined
+        ? { kind: 'idle' }
+        : {
+            kind: 'ready',
+            translated: translation.data.translation.translated,
+            fellBack: translation.data.translation.fellBackToOriginal,
+            notice: translation.data.translation.generation.model.startsWith('mock')
+              ? t('translate.mockNotice')
+              : null,
+          };
 
   function chooseStage(next: TranslationStage) {
     setStage(next);
-    void run(next);
+    mutate(next);
   }
 
   /**
@@ -249,7 +252,7 @@ function TranslationSheetBody({
           {state.kind === 'error' && (
             <View style={{ gap: theme.spacing.sm }}>
               <Text tone="warning">{t(state.messageKey)}</Text>
-              <PressableRow onPress={() => void run(stage)} accessibilityLabel={t('common.retry')}>
+              <PressableRow onPress={() => mutate(stage)} accessibilityLabel={t('common.retry')}>
                 <Text tone="accent">{t('common.retry')}</Text>
               </PressableRow>
             </View>
