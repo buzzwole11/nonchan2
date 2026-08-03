@@ -841,3 +841,63 @@ class IngestionRun(Base):
     counts: Mapped[dict[str, Any]] = mapped_column(JsonType, nullable=False, default=dict)
     #: Why it failed, in the operator's words rather than a stack trace.
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class ContentReport(Base):
+    """A reader saying something looks wrong (spec sections 12, 27).
+
+    Deliberately **not** a `review_events` row. That table records a *decision* —
+    approved, rejected, needs_changes — made by someone with the standing to make it. This
+    records a *report*: a reader who has spotted something and has no authority over what
+    happens next, and should not be given the vocabulary of one. Storing both in one table
+    would make "approved" a thing an anonymous guest can assert.
+
+    It also does not touch `verification_status`. That column is the record of which
+    mechanical checks ran and what they returned; a reader's opinion is not a check, and
+    letting a report change it would put a claim nobody verified into a field whose entire
+    value is that everything in it was.
+
+    Section 27 counts these — AI説明の問題報告率 is a guardrail — which is why the report
+    names the entity rather than just the card: `equations` and `derivation_steps` carry
+    `provenance_kind`, so reports can be split by whether the thing reported came from the
+    paper or from a model.
+    """
+
+    __tablename__ = "content_reports"
+    __table_args__ = (
+        CheckConstraint(
+            "entity_type IN ('math_card', 'derivation_step', 'equation')",
+            name="ck_content_report_entity_type",
+        ),
+        vocab_check("reason", "reportReason"),
+        vocab_check("status", "reportStatus"),
+        # One report per reader per problem per thing. A reader tapping twice is not two
+        # readers, and section 27's metric is a *rate* — duplicates would inflate it.
+        UniqueConstraint(
+            "user_id", "entity_type", "entity_id", "reason", name="uq_content_report_once"
+        ),
+        Index("ix_content_reports_entity", "entity_type", "entity_id"),
+        Index("ix_content_reports_status", "status", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UuidType, primary_key=True, default=_uuid)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UuidType, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    entity_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    entity_id: Mapped[uuid.UUID] = mapped_column(UuidType, nullable=False)
+    #: The card the reader was looking at, even when they reported one step of it. Without
+    #: it a step report cannot be shown next to the card it belongs to.
+    math_card_id: Mapped[uuid.UUID | None] = mapped_column(
+        UuidType, ForeignKey("math_cards.id", ondelete="CASCADE"), nullable=True
+    )
+    reason: Mapped[str] = mapped_column(String(48), nullable=False)
+    #: The reader's own words. Optional, and bounded — this is a report, not a discussion.
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="new")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )

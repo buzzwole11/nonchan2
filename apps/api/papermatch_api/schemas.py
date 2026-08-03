@@ -579,6 +579,35 @@ class MathCardOut(CamelModel):
     id: uuid.UUID
 
 
+class ReportRequest(CamelModel):
+    """A reader saying something on a maths card looks wrong (spec sections 12, 27)."""
+
+    reason: str
+    #: Which part. Absent means the card as a whole; the two are mutually exclusive.
+    step_id: uuid.UUID | None = None
+    equation_id: uuid.UUID | None = None
+    #: The reader's own words. A pointer, not a discussion.
+    detail: str | None = Field(default=None, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def _valid_reason(cls, value: str) -> str:
+        if not vocab.is_valid("reportReason", value):
+            raise ValueError(f"must be one of: {', '.join(vocab.values('reportReason'))}")
+        return value
+
+
+class ReportResponse(CamelModel):
+    """What actually happened — not a promise that someone will look at it."""
+
+    reason: str
+    #: What the report was filed against, so the client can mark that control as reported.
+    entity_type: str
+    entity_id: uuid.UUID
+    #: True when this replaced the reader's earlier report of the same problem.
+    already_reported: bool
+
+
 class MathCardDetailResponse(CamelModel):
     """Everything Focus Mode needs in one round trip (spec section 10).
 

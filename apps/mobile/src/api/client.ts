@@ -27,6 +27,8 @@ import type {
   MathCardDetailResponse,
   MathCardListResponse,
   PaperListResponse,
+  ReportRequest,
+  ReportResponse,
   ReviewOutcome,
   ReviewQueueResponse,
   SavePaperRequest,
@@ -228,6 +230,14 @@ export class ApiClient {
    */
   translate(body: CreateTranslationRequest): Promise<CreateTranslationResponse> {
     return this.request<CreateTranslationResponse>('/translations', { method: 'POST', body });
+  }
+
+  /** Report that something on a maths card looks wrong (spec sections 12, 27). */
+  reportMathCard(cardId: string, body: ReportRequest): Promise<ReportResponse> {
+    return this.request<ReportResponse>(`/math-cards/${cardId}/feedback`, {
+      method: 'POST',
+      body,
+    });
   }
 
   // -- saved ---------------------------------------------------------------------

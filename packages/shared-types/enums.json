@@ -104,6 +104,21 @@
       "undo"
     ]
   },
+  "reportReason": {
+    "$note": "Section 12: a reader saying a maths card looks wrong. Deliberately not `reviewDecision` — a reader reports a problem, a reviewer decides what to do about it. Section 27 counts these as a guardrail (AI説明の問題報告率).",
+    "values": [
+      "formula_differs_from_paper",
+      "step_wrong",
+      "explanation_wrong",
+      "symbol_wrong",
+      "rendering_broken",
+      "other"
+    ]
+  },
+  "reportStatus": {
+    "$note": "Section 12 step 10: 必要なカードのみ人手レビューへ送る.",
+    "values": ["new", "triaged", "resolved"]
+  },
   "feedReason": {
     "$note": "Section 6: recommendation reasons must be explainable, never a single opaque score.",
     "values": ["similar_to_saved", "matches_field", "adjacent_field", "foundational", "recent"]

@@ -23,7 +23,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from papermatch_api.db import get_db
-from papermatch_api.models import DerivationStep, Equation, MathCard, Paper
+from papermatch_api.models import DerivationStep, Equation, MathCard, Paper, User
 from papermatch_api.schemas import (
     DerivationStepOut,
     EquationListResponse,
@@ -32,13 +32,17 @@ from papermatch_api.schemas import (
     MathCardDetailResponse,
     MathCardListResponse,
     MathCardOut,
+    ReportRequest,
+    ReportResponse,
 )
+from papermatch_api.security import current_user
 from papermatch_api.services.equations import (
     derivation_steps_for,
     renderable,
     symbols_for,
     visible_equations,
 )
+from papermatch_api.services.reports import ReportError, submit_report
 from papermatch_api.text.latex_safety import check_latex
 
 router = APIRouter(tags=["equations"])
@@ -157,4 +161,53 @@ def get_math_card(
         equations=[serialize_equation(db, e) for e in ordered],
         steps=[serialize_step(s) for s in shown],
         hidden_step_count=len(everything) - len(shown),
+    )
+
+
+@router.post(
+    "/math-cards/{card_id}/feedback",
+    response_model=ReportResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def report_math_card(
+    card_id: uuid.UUID,
+    body: ReportRequest,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(current_user)],
+) -> ReportResponse:
+    """A reader saying this looks wrong (spec sections 12, 27).
+
+    Recording it is the whole of what happens. The card is not hidden, its
+    `verification_status` is not touched, and nothing is promised — the response says what
+    was stored, because in this build nobody reviews the queue yet and saying otherwise
+    would be a promise the app cannot keep.
+    """
+    card = db.get(MathCard, card_id)
+    if card is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "math_card_not_found", "message": "No maths card with that id."},
+        )
+
+    try:
+        outcome = submit_report(
+            db,
+            user,
+            card,
+            reason=body.reason,
+            step_id=body.step_id,
+            equation_id=body.equation_id,
+            detail=body.detail,
+        )
+    except ReportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"code": exc.code, "message": exc.message},
+        ) from exc
+
+    return ReportResponse(
+        reason=outcome.report.reason,
+        entity_type=outcome.report.entity_type,
+        entity_id=outcome.report.entity_id,
+        already_reported=outcome.repeated,
     )

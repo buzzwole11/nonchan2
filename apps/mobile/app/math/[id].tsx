@@ -46,6 +46,7 @@ import {
   stepBetween,
   visibleSteps,
 } from '../../src/math/focus';
+import { ReportSheet, type ReportStatus } from '../../src/math/ReportSheet';
 import { useTheme } from '../../src/theme/ThemeProvider';
 
 export default function FocusModeScreen() {
@@ -58,6 +59,8 @@ export default function FocusModeScreen() {
   const [failed, setFailed] = useState(false);
   const [tab, setTab] = useState<FocusTab>('derivation');
   const [detail, setDetail] = useState<DetailLevel>('standard');
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportStatus, setReportStatus] = useState<ReportStatus>({ kind: 'idle' });
 
   const locale: 'ja' | 'en' = (user?.settings.locale ?? 'ja').startsWith('en') ? 'en' : 'ja';
   const t = useCallback(
@@ -182,8 +185,41 @@ export default function FocusModeScreen() {
           {tab === 'structure' && <StructureTab chain={view.equations} locale={locale} />}
           {tab === 'meaning' && <MeaningTab card={card} t={t} />}
           {tab === 'limits' && <LimitsTab steps={card.steps} t={t} />}
+
+          {/* Section 12 requires AI説明は数式的真偽を保証しないことを明示する. Saying the
+              content might be wrong and then offering nowhere to disagree is half a
+              promise, so the way to disagree sits on the same screen as the label. */}
+          <PressableRow
+            onPress={() => {
+              setReportStatus({ kind: 'idle' });
+              setReportOpen(true);
+            }}
+            accessibilityLabel={t('report.open')}
+            style={{ marginTop: theme.spacing.lg }}
+          >
+            <Text variant="caption" tone="secondary">
+              {t('report.open')}
+            </Text>
+          </PressableRow>
         </View>
       </ScrollView>
+
+      <ReportSheet
+        visible={reportOpen}
+        locale={locale}
+        status={reportStatus}
+        onSend={(reason, note) => {
+          if (typeof id !== 'string') return;
+          setReportStatus({ kind: 'sending' });
+          void api
+            .reportMathCard(id, { reason, detail: note.trim() || undefined })
+            .then((response) =>
+              setReportStatus({ kind: 'recorded', already: response.alreadyReported }),
+            )
+            .catch(() => setReportStatus({ kind: 'failed' }));
+        }}
+        onClose={() => setReportOpen(false)}
+      />
     </>
   );
 }

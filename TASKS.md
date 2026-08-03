@@ -158,6 +158,10 @@ AI が要る項目は環境制約で未着手です（DECISIONS.md D-024）。
 - [x] **未検証の変形を既定で非表示**（仕様書 12 節）— 隠した件数は返すので、
       導出が完全であるかのように見えることはない
 - [x] API — `GET /papers/{id}/equations`、`GET /math-cards`、`GET /math-cards/{id}`
+- [x] **問題報告 `POST /math-cards/{id}/feedback`**（`services/reports.py`、migration `0006`）—
+      読者の報告は `review_events`（判断）とは別テーブル。`verification_status` を動かさず、
+      カードも隠さない。1 人 1 対象 1 理由につき 1 件（27 節の指標は「率」なので重複を数えない）。
+      由来別に数えられる（AI 説明の問題報告率、DECISIONS.md D-038）
 
 ### 4-B レンダリング — 文書生成は完了。WebView 統合は実機確認待ち
 - [x] **Abstract のインライン数式を組版**（`src/math/abstractDocument.ts`、`src/discover/AbstractBody.tsx`）—

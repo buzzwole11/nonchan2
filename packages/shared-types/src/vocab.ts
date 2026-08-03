@@ -121,6 +121,17 @@ export const ACTION_TYPES = [
   'undo',
 ] as const;
 
+export const REPORT_REASONS = [
+  'formula_differs_from_paper',
+  'step_wrong',
+  'explanation_wrong',
+  'symbol_wrong',
+  'rendering_broken',
+  'other',
+] as const;
+
+export const REPORT_STATUSES = ['new', 'triaged', 'resolved'] as const;
+
 export const FEED_REASONS = [
   'similar_to_saved',
   'matches_field',
@@ -201,6 +212,8 @@ export type DetectionMethod = (typeof DETECTION_METHODS)[number];
 export type ExpressionKind = (typeof EXPRESSION_KINDS)[number];
 export type ReviewOutcome = (typeof REVIEW_OUTCOMES)[number];
 export type SaveReason = (typeof SAVE_REASONS)[number];
+export type ReportReason = (typeof REPORT_REASONS)[number];
+export type ReportStatus = (typeof REPORT_STATUSES)[number];
 export type SavedStatus = (typeof SAVED_STATUSES)[number];
 export type ActionType = (typeof ACTION_TYPES)[number];
 export type FeedReason = (typeof FEED_REASONS)[number];
@@ -228,6 +241,8 @@ export const VOCABULARY_TUPLES: Record<string, readonly string[]> = {
   abstractSection: ABSTRACT_SECTIONS,
   detectionMethod: DETECTION_METHODS,
   saveReason: SAVE_REASONS,
+  reportReason: REPORT_REASONS,
+  reportStatus: REPORT_STATUSES,
   expressionKind: EXPRESSION_KINDS,
   reviewOutcome: REVIEW_OUTCOMES,
   savedStatus: SAVED_STATUSES,

@@ -23,6 +23,7 @@ import type {
   MathCardType,
   MathLevel,
   ProvenanceKind,
+  ReportReason,
   ReviewOutcome,
   SaveReason,
   SavedStatus,
@@ -310,4 +311,21 @@ export interface MathCardDetailResponse {
 
 export interface EquationListResponse {
   equations: EquationView[];
+}
+
+/** A reader saying something on a maths card looks wrong (spec sections 12, 27). */
+export interface ReportRequest {
+  reason: ReportReason;
+  /** Which part. Absent means the card as a whole; the two are mutually exclusive. */
+  stepId?: string;
+  equationId?: string;
+  detail?: string;
+}
+
+export interface ReportResponse {
+  reason: ReportReason;
+  entityType: 'math_card' | 'derivation_step' | 'equation';
+  entityId: string;
+  /** True when this replaced the reader's earlier report of the same problem. */
+  alreadyReported: boolean;
 }
