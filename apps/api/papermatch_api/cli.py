@@ -19,6 +19,7 @@ from papermatch_api.providers.base import PaperQuery
 from papermatch_api.providers.registry import get_paper_provider
 from papermatch_api.services.ingestion import ingest, load_fields
 from papermatch_api.services.math_content import load_math_cards
+from papermatch_api.services.metrics import collect
 from papermatch_api.services.worker import default_jobs, run_summary, summarise, tick
 
 
@@ -95,6 +96,13 @@ def runs(limit: int) -> int:
     return 0
 
 
+def metrics(window: int) -> int:
+    """Print section 27's numbers, including the ones nothing can compute yet."""
+    with session_scope() as session:
+        print(collect(session, window_days=window).render())
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="papermatch")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -109,6 +117,9 @@ def main(argv: list[str] | None = None) -> int:
     runs_parser = sub.add_parser("runs", help="show the recent ingestion run log")
     runs_parser.add_argument("--limit", type=int, default=20)
 
+    metrics_parser = sub.add_parser("metrics", help="section 27's指標 and guardrails")
+    metrics_parser.add_argument("--window", type=int, default=7, help="days to look back")
+
     args = parser.parse_args(argv)
     if args.command == "seed":
         return seed(args.limit)
@@ -116,6 +127,8 @@ def main(argv: list[str] | None = None) -> int:
         return worker(args.once, args.interval)
     if args.command == "runs":
         return runs(args.limit)
+    if args.command == "metrics":
+        return metrics(args.window)
     parser.error(f"unknown command {args.command}")
     return 2
 

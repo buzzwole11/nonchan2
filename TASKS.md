@@ -274,6 +274,8 @@ AI が要る項目は環境制約で未着手です（DECISIONS.md D-024）。
 | モバイルの E2E | Phase 1-D（Maestro）。Phase 0 の E2E は API レベル |
 | pgvector 列 | Phase 3（DECISIONS.md D-006） |
 | レート制限 | Provider 側は実装済み（`providers/http.py`）。API 側の呼び出し元制限は未実装 |
-| 観測性 | 構造化ログ・トレース・Provider レイテンシ指標は未実装 |
+| 観測性 | 構造化ログ・トレース・Provider レイテンシ指標は未実装。27 節の指標は `cli.py metrics` で集計できる |
+| クライアント計測 | クラッシュ率・ジェスチャー失敗率（27 節のガードレール）を送る仕組みが無い |
+| 数式カード完了率 | 「完了」を記録するイベントが無いので算出できない（27 節） |
 | 数式の LaTeX 解析 | チェックは著者が並記した機械可読形に対して行う。LaTeX 本体との食い違いは検出できない（D-028） |
 | AI 説明・実翻訳 | 環境がネットワークを遮断（DECISIONS.md D-024）。interface は Phase 0 から存在 |
