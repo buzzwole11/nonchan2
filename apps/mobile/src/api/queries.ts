@@ -37,6 +37,7 @@ export interface Offlineable<T> {
 
 export const queryKeys = {
   saved: (sort: string) => ['saved', sort] as const,
+  search: (query: string) => ['search', query] as const,
   expressions: () => ['expressions'] as const,
   review: () => ['review'] as const,
   mathCards: () => ['math-cards'] as const,
@@ -77,6 +78,28 @@ export function savedQuery(api: ApiClient, sort: string) {
         };
       }
     },
+  };
+}
+
+/**
+ * Search the saved library (spec section 24, D-041).
+ *
+ * There is deliberately **no offline fallback here**, unlike `savedQuery`. Substring
+ * matching over the AsyncStorage cache would be easy and would quietly answer a different
+ * question: the cache holds one page of one sort order, so an offline search would report
+ * "nothing matches" for a paper the reader definitely saved. Saying "search needs a
+ * connection" is the honest answer; the cached library is still listed underneath.
+ *
+ * `enabled` keeps a blank box from making a request. The server also treats blank as "not
+ * asked yet" — the check exists in both places because the client one saves a round trip
+ * and the server one is the definition.
+ */
+export function searchQuery(api: ApiClient, query: string) {
+  const trimmed = query.trim();
+  return {
+    queryKey: queryKeys.search(trimmed),
+    queryFn: () => api.searchSaved(trimmed),
+    enabled: trimmed.length > 0,
   };
 }
 

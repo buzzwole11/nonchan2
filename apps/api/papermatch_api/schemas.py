@@ -353,6 +353,26 @@ class SavedListResponse(CamelModel):
     total: int
 
 
+class SearchHitOut(CamelModel):
+    """One row from the reader's library, with why it came back.
+
+    `matchedField` exists for the same reason a feed card carries its reason (section 6):
+    a hit whose cause is invisible looks like the search is guessing, and the reader cannot
+    tell a title match from a word buried in an abstract.
+    """
+
+    saved_paper: SavedPaperOut
+    paper: PaperOut
+    matched_field: str
+
+
+class SearchResponse(CamelModel):
+    query: str
+    hits: list[SearchHitOut]
+    #: True when the query was empty — the client shows the library rather than "no results".
+    empty_query: bool = False
+
+
 class SavePaperRequest(CamelModel):
     reasons: list[str] = Field(default_factory=list, max_length=10)
     notes: str | None = Field(default=None, max_length=4000)

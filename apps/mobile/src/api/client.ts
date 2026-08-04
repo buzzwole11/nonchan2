@@ -35,6 +35,7 @@ import type {
   SavedListQuery,
   SavedListResponse,
   SavedPaperResponse,
+  SearchResponse,
   UndoResponse,
   UpdateSavedRequest,
   User,
@@ -253,6 +254,16 @@ export class ApiClient {
         cursor: query.cursor,
       },
     });
+  }
+
+  /**
+   * Search the saved library (spec section 24) — not the corpus; see D-041.
+   *
+   * A blank query is sent rather than short-circuited on the client so that "not typed yet"
+   * has one definition, on the server, instead of two that can drift apart.
+   */
+  searchSaved(query: string, limit = 30): Promise<SearchResponse> {
+    return this.request<SearchResponse>('/search', { query: { q: query, limit } });
   }
 
   savePaper(paperId: string, body: SavePaperRequest = {}): Promise<SavedPaperResponse> {

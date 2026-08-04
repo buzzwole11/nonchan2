@@ -94,7 +94,8 @@ papermatch_api/
   services/          ingestion（取り込み・重複統合・監査）, feed（枠配分・多様性・調整）,
                      scoring（推薦スコア）, embeddings（ベクトルの保存と読み出し）,
                      structure / method_kind（規則ベースの分類器）, activity, math_content,
-                     worker（定期取り込みと撤回同期）
+                     worker（定期取り込みと撤回同期）, search（保存ライブラリの検索 — D-041）,
+                     reports（読者からの問題報告）, metrics（27 節の指標）
   providers/         base（interface）, arxiv, openalex, local_embedding, mock_*, registry
   text/              normalize, dedup, math_placeholders, latex_safety
   mathcheck/         数値代入と次元解析

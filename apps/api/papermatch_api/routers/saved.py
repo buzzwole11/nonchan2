@@ -23,12 +23,30 @@ from papermatch_api.schemas import (
     SavedPaperOut,
     SavedPaperResponse,
     SavePaperRequest,
+    SearchHitOut,
+    SearchResponse,
     UpdateSavedRequest,
 )
 from papermatch_api.security import CurrentUser
 from papermatch_api.services import activity
+from papermatch_api.services.search import MAX_QUERY_LENGTH, search_library
 
 router = APIRouter(tags=["saved"])
+
+
+def abstract_segments_for(
+    db: Session, paper_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, list[AbstractSegment]]:
+    """Structure labels for a page of papers, in one query rather than one per paper."""
+    grouped: dict[uuid.UUID, list[AbstractSegment]] = {}
+    if not paper_ids:
+        return grouped
+    for segment in db.execute(
+        select(AbstractSegment).where(AbstractSegment.paper_id.in_(paper_ids))
+    ).scalars():
+        grouped.setdefault(segment.paper_id, []).append(segment)
+    return grouped
+
 
 SORT_KEYS = (
     "recently_saved",
@@ -136,13 +154,7 @@ def list_saved(
     has_more = len(rows) > limit
     rows = rows[:limit]
 
-    paper_ids = [paper.id for _, paper in rows]
-    segments: dict[uuid.UUID, list[AbstractSegment]] = {}
-    if paper_ids:
-        for segment in db.execute(
-            select(AbstractSegment).where(AbstractSegment.paper_id.in_(paper_ids))
-        ).scalars():
-            segments.setdefault(segment.paper_id, []).append(segment)
+    segments = abstract_segments_for(db, [paper.id for _, paper in rows])
 
     return SavedListResponse(
         saved=[
@@ -244,3 +256,37 @@ def delete_saved(
             detail={"code": "not_saved", "message": "This paper is not in the saved library"},
         )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/search", response_model=SearchResponse)
+def search(
+    db: Annotated[Session, Depends(get_db)],
+    user: CurrentUser,
+    q: str = Query(default="", max_length=MAX_QUERY_LENGTH),
+    limit: int = Query(default=30, ge=1, le=100),
+) -> SearchResponse:
+    """Search the reader's saved library (spec sections 2, 14, 24).
+
+    Not the corpus. Section 2's fifth job is 保存した論文を後から検索し、学習素材として再利用
+    したい, and section 16 makes discovery a feed rather than a query — see
+    `services/search.py` for why that distinction is deliberate.
+
+    An empty query is not an error and not "no results": it means the reader has not typed
+    anything yet, and the client should show the library it already has.
+    """
+    if not q.strip():
+        return SearchResponse(query=q, hits=[], empty_query=True)
+
+    hits = search_library(db, user, q, limit=limit)
+    segments = abstract_segments_for(db, [hit.paper.id for hit in hits])
+    return SearchResponse(
+        query=q,
+        hits=[
+            SearchHitOut(
+                saved_paper=SavedPaperOut.model_validate(hit.saved),
+                paper=serialize_paper(hit.paper, segments.get(hit.paper.id, [])),
+                matched_field=hit.matched,
+            )
+            for hit in hits
+        ],
+    )

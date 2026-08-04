@@ -184,6 +184,32 @@ export interface SavePaperRequest {
   notes?: string | null;
 }
 
+/**
+ * Which field a search hit matched on, strongest first (spec section 24).
+ *
+ * Shown next to the result for the same reason a feed card carries its reason (section 6):
+ * a hit with no visible cause looks like the search is guessing.
+ */
+export const SEARCH_MATCH_FIELDS = ['title', 'author', 'venue', 'note', 'abstract'] as const;
+
+export type SearchMatchField = (typeof SEARCH_MATCH_FIELDS)[number];
+
+export interface SearchHit {
+  savedPaper: SavedPaper;
+  paper: Paper;
+  matchedField: SearchMatchField;
+}
+
+export interface SearchResponse {
+  query: string;
+  hits: SearchHit[];
+  /**
+   * True when the reader has not typed anything yet. Distinct from `hits: []` with a real
+   * query, which means "searched, found nothing" — the two need different screens.
+   */
+  emptyQuery: boolean;
+}
+
 export interface SavedPaperResponse {
   savedPaper: SavedPaper;
   paper: Paper;
