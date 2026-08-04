@@ -7,6 +7,16 @@
  */
 import tokensJson from '../tokens/tokens.json' with { type: 'json' };
 
+export {
+  FIELD_BASE_COLORS,
+  UNKNOWN_FIELD_COLOR,
+  blendFieldColors,
+  fieldColor,
+  hexToOklab,
+  oklabToHex,
+  type Oklab,
+} from './fieldColor.ts';
+
 export const tokens = tokensJson;
 
 export type ColorScheme = 'light' | 'dark';
