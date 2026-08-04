@@ -20,6 +20,7 @@ from papermatch_api.providers.registry import get_paper_provider
 from papermatch_api.services.ingestion import ingest, load_fields
 from papermatch_api.services.math_content import load_math_cards
 from papermatch_api.services.metrics import collect
+from papermatch_api.services.review import review_queue
 from papermatch_api.services.worker import default_jobs, run_summary, summarise, tick
 
 
@@ -103,6 +104,31 @@ def metrics(window: int) -> int:
     return 0
 
 
+def review(limit: int) -> int:
+    """Print the human review queue (spec section 12, step 10).
+
+    Read-only. Recording a decision is deliberately not a CLI flag: an approval is what
+    lets a card's steps claim `human_reviewed`, and that should be a considered action in
+    a reviewing surface, not one keystroke away from a listing command.
+    """
+    with session_scope() as session:
+        items = review_queue(session, limit=limit)
+        if not items:
+            print("レビュー待ちのカードはありません。")
+            return 0
+        print(f"レビュー待ち {len(items)} 件（緊急なものから）\n")
+        for item in items:
+            print(f"[{item.card.review_status}] {item.card.title}")
+            print(f"    理由: {item.reason_text}")
+            print(
+                f"    報告 {item.report_count} 件 / "
+                f"未検証の変形 {item.unverified_step_count} / {item.total_step_count}"
+            )
+            print(f"    id: {item.card.id}")
+            print()
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="papermatch")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -120,6 +146,9 @@ def main(argv: list[str] | None = None) -> int:
     metrics_parser = sub.add_parser("metrics", help="section 27's指標 and guardrails")
     metrics_parser.add_argument("--window", type=int, default=7, help="days to look back")
 
+    review_parser = sub.add_parser("review", help="the human review queue (spec section 12)")
+    review_parser.add_argument("--limit", type=int, default=20)
+
     args = parser.parse_args(argv)
     if args.command == "seed":
         return seed(args.limit)
@@ -129,6 +158,8 @@ def main(argv: list[str] | None = None) -> int:
         return runs(args.limit)
     if args.command == "metrics":
         return metrics(args.window)
+    if args.command == "review":
+        return review(args.limit)
     parser.error(f"unknown command {args.command}")
     return 2
 
