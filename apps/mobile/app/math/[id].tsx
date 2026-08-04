@@ -127,6 +127,7 @@ export default function FocusModeScreen() {
               locale={locale}
               renderable={lead.renderable}
               refusalReasons={lead.refusalReasons}
+              provenanceKind={lead.provenanceKind}
               accessibilityLabel={card.card.title}
             />
           )}
@@ -316,6 +317,7 @@ function DerivationTab({
                 locale={locale}
                 renderable={equation.renderable}
                 refusalReasons={equation.refusalReasons}
+                provenanceKind={equation.provenanceKind}
               />
             </View>
             {between !== null && <Operation step={between} detail={detail} locale={locale} t={t} />}
@@ -361,7 +363,13 @@ function Operation({
       <Text variant="caption" tone="accent">
         ↓ {step.operation}
       </Text>
-      <MathView latex={step.latex} locale={locale} renderable={step.renderable} display={false} />
+      <MathView
+        latex={step.latex}
+        locale={locale}
+        renderable={step.renderable}
+        display={false}
+        provenanceKind={step.provenanceKind}
+      />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
         <Chip label={t(`verification.${step.verificationStatus}` as MessageKey)} tone="saved" />
         {/* Spec section 10: 各操作にWhy?ボタン. */}
@@ -498,6 +506,7 @@ function StructureTab({ chain, locale }: { chain: EquationView[]; locale: 'ja' |
             locale={locale}
             renderable={equation.renderable}
             refusalReasons={equation.refusalReasons}
+            provenanceKind={equation.provenanceKind}
           />
         </View>
       ))}

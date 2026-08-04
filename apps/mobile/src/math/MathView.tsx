@@ -24,13 +24,22 @@
  */
 
 import { useCallback, useMemo, useState } from 'react';
-import { ScrollView, View, type StyleProp, type ViewStyle } from 'react-native';
-import { WebView, type WebViewMessageEvent } from 'react-native-webview';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
+import type { ProvenanceKind } from '@papermatch/shared-types';
 
 import { Text } from '../components/Text';
 import { type MessageKey, translate } from '../i18n';
 import { useTheme } from '../theme/ThemeProvider';
 import { MATH_MESSAGE_KIND, type MathRenderResult, buildMathDocument } from './document';
+import { MathFrame } from './MathFrame';
+import { useFormulaZoom } from './formulaZoom';
 
 export interface MathViewProps {
   latex: string;
@@ -42,6 +51,24 @@ export interface MathViewProps {
   display?: boolean;
   /** Read instead of the formula's markup (spec sections 11, 20). */
   accessibilityLabel?: string;
+  /** Told when the formula turned out wider than its space, so a caller can say so. */
+  onOverflowChange?: (overflow: boolean) => void;
+  /**
+   * Multiplier on the reading font size (spec section 11: フォント拡大).
+   *
+   * A multiplier and not a point size, so the reader's Dynamic Type setting still applies —
+   * an absolute size would silently override it for the one element that most needs it.
+   */
+  fontScale?: number;
+  /** Raise for a full-screen view, where nothing is competing for the space. */
+  maxHeight?: number;
+  /** Where the formula came from, so the full-screen view can keep saying so. */
+  provenanceKind?: ProvenanceKind;
+  /**
+   * Set false inside the full-screen view itself, which must not offer to open another one.
+   * Elsewhere the tap is wired automatically when a `FormulaZoomProvider` is above.
+   */
+  zoomable?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -58,6 +85,11 @@ export function MathView({
   refusalReasons = [],
   display = true,
   accessibilityLabel,
+  onOverflowChange,
+  fontScale = 1,
+  maxHeight = MAX_HEIGHT,
+  provenanceKind,
+  zoomable = true,
   style,
 }: MathViewProps) {
   const theme = useTheme();
@@ -65,35 +97,54 @@ export function MathView({
   const [failed, setFailed] = useState(false);
   const t = (key: MessageKey) => translate(locale, key);
 
+  // No provider above means no screen to open over, so the formula is simply not tappable
+  // rather than tappable-and-doing-nothing.
+  const zoom = useFormulaZoom();
+  const onPress =
+    zoomable && zoom !== null
+      ? () =>
+          zoom({
+            latex,
+            provenanceKind,
+            renderable,
+            refusalReasons,
+            accessibilityLabel,
+          })
+      : undefined;
+
   const html = useMemo(
     () =>
       buildMathDocument(latex, {
         display,
         // Already multiplied by the clamped Dynamic Type scale, so the formula grows with
-        // the text around it (spec section 20).
-        fontSize: theme.type('abstract').fontSize,
+        // the text around it (spec section 20); `fontScale` is the reader's own zoom on top.
+        fontSize: theme.type('abstract').fontSize * fontScale,
         color: theme.color.textPrimary,
         backgroundColor: 'transparent',
         ariaLabel: accessibilityLabel,
       }),
-    [latex, display, theme, accessibilityLabel],
+    [latex, display, theme, accessibilityLabel, fontScale],
   );
 
-  const onMessage = useCallback((event: WebViewMessageEvent) => {
-    let result: MathRenderResult & { kind?: string };
-    try {
-      result = JSON.parse(event.nativeEvent.data);
-    } catch {
-      // Not ours, or malformed. Leaving the height alone is the safe outcome — a bad
-      // number here is a formula clipped in half.
-      return;
-    }
-    if (result.kind !== MATH_MESSAGE_KIND) return;
-    if (typeof result.height === 'number' && result.height > 0) {
-      setHeight(Math.min(result.height + 4, MAX_HEIGHT));
-    }
-    setFailed(result.ok === false);
-  }, []);
+  const onMessage = useCallback(
+    (raw: string) => {
+      let result: MathRenderResult & { kind?: string };
+      try {
+        result = JSON.parse(raw);
+      } catch {
+        // Not ours, or malformed. Leaving the height alone is the safe outcome — a bad
+        // number here is a formula clipped in half.
+        return;
+      }
+      if (result.kind !== MATH_MESSAGE_KIND) return;
+      if (typeof result.height === 'number' && result.height > 0) {
+        setHeight(Math.min(result.height + 4, maxHeight));
+      }
+      setFailed(result.ok === false);
+      onOverflowChange?.(result.overflow === true);
+    },
+    [maxHeight, onOverflowChange],
+  );
 
   if (!renderable) {
     return (
@@ -102,45 +153,43 @@ export function MathView({
         caption={t('math.refused')}
         detail={refusalReasons.join(', ')}
         style={style}
+        onPress={onPress}
+        openLabel={t('math.fullscreen.open')}
       />
     );
   }
 
   return (
     <View style={style}>
-      <View
+      {/* `Pressable` and not `View`, even though the overlay below is what catches most
+          taps. A screen reader activates *this* element, so an `onPress` that lived only on
+          the overlay would leave the formula announcing itself as a button and doing
+          nothing when double-tapped. */}
+      <Pressable
         style={{ height }}
+        onPress={onPress}
         accessible
-        accessibilityRole="image"
+        // A formula that opens full screen is a button, and saying `image` would tell a
+        // screen reader there is nothing to activate here.
+        accessibilityRole={onPress === undefined ? 'image' : 'button'}
+        accessibilityHint={onPress === undefined ? undefined : t('math.fullscreen.open')}
         accessibilityLabel={accessibilityLabel ?? t('math.formula')}
       >
-        <WebView
-          source={{ html }}
-          onMessage={onMessage}
-          // Spec section 25: the WebView renders, it does not browse. The document is
-          // self-contained and carries a policy forbidding loads; this refuses the
-          // navigation itself, which is the barrier that does not depend on the document
-          // being the one we built.
-          onShouldStartLoadWithRequest={(request) => request.url === 'about:blank'}
-          originWhitelist={['about:']}
-          javaScriptEnabled
-          // Nothing to store, and nothing that should outlive the view.
-          domStorageEnabled={false}
-          incognito
-          cacheEnabled={false}
-          // The document sizes itself; a scrolling WebView inside a scrolling screen is
-          // the classic way to make a list impossible to scroll.
-          scrollEnabled={false}
-          nestedScrollEnabled={false}
-          showsHorizontalScrollIndicator={false}
-          showsVerticalScrollIndicator={false}
-          style={{ backgroundColor: 'transparent', height }}
-          // Android renders a white box behind a transparent WebView without this.
-          androidLayerType="software"
-          // The view is one element to the platform; the label above describes it.
-          importantForAccessibility="no-hide-descendants"
-        />
-      </View>
+        <MathFrame html={html} height={height} onMessage={onMessage} />
+        {/* The renderer consumes its own touches, so a finger landing on the formula never
+            reaches the Pressable around it. This layer catches those. Hidden from the
+            screen reader because the element around it already carries the label, the role
+            and the hint — announcing the same formula twice is worse than not making it
+            tappable at all. */}
+        {onPress !== undefined && (
+          <Pressable
+            onPress={onPress}
+            style={StyleSheet.absoluteFill}
+            importantForAccessibility="no-hide-descendants"
+            accessibilityElementsHidden
+          />
+        )}
+      </Pressable>
       {failed && (
         <Text variant="caption" tone="warning" accessibilityLiveRegion="polite">
           {t('math.renderFailed')}
@@ -162,11 +211,15 @@ function SourceFallback({
   caption,
   detail,
   style,
+  onPress,
+  openLabel,
 }: {
   latex: string;
   caption: string;
   detail?: string;
   style?: StyleProp<ViewStyle>;
+  onPress?: () => void;
+  openLabel?: string;
 }) {
   const theme = useTheme();
   return (
@@ -190,6 +243,15 @@ function SourceFallback({
           {latex}
         </Text>
       </ScrollView>
+      {/* A refused formula is the case where copying the source matters most: the reader
+          cannot see it typeset here and has to take it somewhere that can. */}
+      {onPress !== undefined && (
+        <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={openLabel}>
+          <Text variant="caption" tone="accent">
+            {openLabel}
+          </Text>
+        </Pressable>
+      )}
     </View>
   );
 }

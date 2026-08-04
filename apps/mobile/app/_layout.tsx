@@ -5,24 +5,31 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { createQueryClient } from '../src/api/queries';
-import { SessionProvider } from '../src/api/session';
+import { SessionProvider, useSession } from '../src/api/session';
+import { FormulaZoomProvider } from '../src/math/FormulaZoomProvider';
 import { ThemeProvider, useTheme } from '../src/theme/ThemeProvider';
 
 function ThemedStack() {
   const theme = useTheme();
+  const { user } = useSession();
+  const locale: 'ja' | 'en' = (user?.settings.locale ?? 'ja').startsWith('en') ? 'en' : 'ja';
 
   return (
     <>
       <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: theme.color.background },
-          // Reduce Motion turns screen transitions into a fade (spec section 20).
-          animation: theme.reduceMotion ? 'fade' : 'default',
-          animationDuration: theme.duration('base'),
-        }}
-      />
+      {/* At the root so that every formula in the app can open full screen (spec section
+          11), rather than only the screens that remembered to provide it. */}
+      <FormulaZoomProvider locale={locale}>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: theme.color.background },
+            // Reduce Motion turns screen transitions into a fade (spec section 20).
+            animation: theme.reduceMotion ? 'fade' : 'default',
+            animationDuration: theme.duration('base'),
+          }}
+        />
+      </FormulaZoomProvider>
     </>
   );
 }

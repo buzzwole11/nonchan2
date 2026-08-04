@@ -61,6 +61,13 @@ export interface MathRenderResult {
   ok: boolean;
   /** Height in CSS pixels, so the native side can size the view to its content. */
   height: number;
+  /**
+   * True when the formula is wider than the space it has and is scrolling sideways.
+   *
+   * Reported because only the renderer can measure it, and a formula cut off at the edge
+   * with no cue reads as a bug rather than as something with more to see.
+   */
+  overflow?: boolean;
   /** KaTeX's message when it could not parse the formula. */
   error?: string;
 }
@@ -130,6 +137,20 @@ export function buildMathDocument(latex: string, options: MathDocumentOptions = 
     overflow-x: auto;
     padding: 4px 2px;
     -webkit-overflow-scrolling: touch;
+    /* Firefox; the WebKit rules below do the same on the platforms that ignore this. */
+    scrollbar-width: thin;
+  }
+  /* Drawn permanently rather than on hover. An overlay scrollbar that appears only while
+     scrolling cannot tell a reader that there is something to scroll to — which is the
+     whole job it has here (spec sections 11, 20). */
+  #root::-webkit-scrollbar {
+    height: 4px;
+    -webkit-appearance: none;
+  }
+  #root::-webkit-scrollbar-thumb {
+    background: ${color};
+    opacity: 0.4;
+    border-radius: 2px;
   }
   /* KaTeX's own error colour is a red that does not survive greyscale on its own; the
      source fallback below is what actually communicates the failure (spec section 20). */
@@ -160,11 +181,24 @@ export function buildMathDocument(latex: string, options: MathDocumentOptions = 
     var serialised = JSON.stringify(message);
     if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
       window.ReactNativeWebView.postMessage(serialised);
+    } else if (window.parent && window.parent !== window) {
+      // The web build has no ReactNativeWebView; it renders this same document in a
+      // sandboxed iframe, which can only talk to its parent this way. '*' as the target
+      // origin because a sandboxed frame's origin is opaque and cannot be named — and
+      // nothing secret travels here, only a height and whether KaTeX succeeded.
+      window.parent.postMessage(serialised, '*');
     }
   }
 
   function height() {
     return Math.ceil(document.body.getBoundingClientRect().height);
+  }
+
+  // Whether the formula is wider than the space it has. The native side cannot measure
+  // inside the renderer, and a formula that is cut off with no visible edge looks like a
+  // rendering fault rather than something to scroll (spec sections 11, 20).
+  function overflows() {
+    return root.scrollWidth > root.clientWidth + 1;
   }
 
   try {
@@ -193,7 +227,7 @@ export function buildMathDocument(latex: string, options: MathDocumentOptions = 
       root.setAttribute('aria-label', data.label);
     }
 
-    post({ kind: data.kind, ok: true, height: height() });
+    post({ kind: data.kind, ok: true, height: height(), overflow: overflows() });
   } catch (error) {
     // Spec section 11: 失敗時は整形済みLaTeXソース. Shown, not hidden — a reader who can
     // see the source can still check the paper, and a blank space tells them nothing.

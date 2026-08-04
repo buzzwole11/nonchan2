@@ -106,6 +106,30 @@ describe('buildMathDocument', () => {
   it('tags its message so the native side can tell it apart', () => {
     expect(JSON.parse(payloadOf(buildMathDocument(latex))).kind).toBe(MATH_MESSAGE_KIND);
   });
+
+  it('reports back to a parent frame as well as to a WebView', () => {
+    // The web build renders this same document in a sandboxed iframe, which has no
+    // `ReactNativeWebView`. Without the second branch the height never arrives and the
+    // formula stays at its placeholder height forever.
+    const html = buildMathDocument(latex);
+    expect(html).toContain('window.ReactNativeWebView.postMessage');
+    expect(html).toContain('window.parent.postMessage');
+  });
+
+  it('measures whether the formula overflows rather than guessing', () => {
+    // Only the renderer can know; the native side cannot see inside it.
+    const html = buildMathDocument(latex);
+    expect(html).toContain('root.scrollWidth > root.clientWidth');
+    expect(html).toContain('overflow: overflows()');
+  });
+
+  it('draws the horizontal scrollbar permanently', () => {
+    // An overlay scrollbar that appears only while scrolling cannot tell a reader that
+    // there is something to scroll to, which is the only job it has here.
+    const html = buildMathDocument(latex);
+    expect(html).toContain('#root::-webkit-scrollbar');
+    expect(html).toContain('scrollbar-width: thin');
+  });
 });
 
 describe('the bundled KaTeX runtime', () => {
