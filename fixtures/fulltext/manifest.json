@@ -33,6 +33,17 @@
       "sourceUrl": "https://example.invalid/abs/2601.00003",
       "version": "v1",
       "expect": "unknown_licence"
+    },
+    {
+      "canonicalId": "arXiv:2601.00004",
+      "file": "algebraic.tex",
+      "bodyFormat": "latex",
+      "licenseId": "CC-BY-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "sourceUrl": "https://example.invalid/abs/2601.00004",
+      "version": "v1",
+      "expect": "permitted",
+      "note": "Purely algebraic, so the translator can read it and the numeric check actually fires. Equation (3) is deliberately wrong, so the pipeline has a step that must NOT pass."
     }
   ]
 }
