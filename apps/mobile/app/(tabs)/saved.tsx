@@ -41,6 +41,7 @@ import { PressableRow } from '../../src/components/PressableRow';
 import { Text } from '../../src/components/Text';
 import { useDebounced } from '../../src/components/useDebounced';
 import { type MessageKey, translate } from '../../src/i18n';
+import { ShareSheet } from '../../src/share/ShareSheet';
 import { useTheme } from '../../src/theme/ThemeProvider';
 
 /** One list row, whichever list it came from — the card renders the same either way. */
@@ -53,11 +54,15 @@ interface Row {
 export default function SavedScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { api, user } = useSession();
+  const { api, user, status } = useSession();
   const [sort, setSort] = useState<SavedSortKey>('recently_saved');
   const [query, setQuery] = useState('');
   const [view, setView] = useState<'library' | 'canvas'>('library');
   const [selectedPaperId, setSelectedPaperId] = useState<string | null>(null);
+  // The row being shared, held whole rather than by id: the sheet needs the paper and the
+  // saved entry together, and looking them up again could disagree with the row that was
+  // tapped after a refetch.
+  const [sharing, setSharing] = useState<Row | null>(null);
   const queryClient = useQueryClient();
 
   const locale: 'ja' | 'en' = (user?.settings.locale ?? 'ja').startsWith('en') ? 'en' : 'ja';
@@ -66,7 +71,10 @@ export default function SavedScreen() {
 
   // The offline fallback lives inside the query function (`savedQuery`), so the rows and
   // the offline flag always came from the same attempt and cannot disagree for a render.
-  const { data, isPending } = useQuery(savedQuery(api, sort));
+  // Held until the session has a token. `status === 'offline'` still counts as settled:
+  // the request then fails as a NetworkError and `savedQuery` answers from the cache.
+  const bootstrapped = status !== 'loading';
+  const { data, isPending, isError, refetch } = useQuery(savedQuery(api, sort, bootstrapped));
   const total = data?.rows.total ?? 0;
   const offline = data?.offline ?? false;
 
@@ -74,7 +82,7 @@ export default function SavedScreen() {
   // would already be stale when they landed.
   const settled = useDebounced(query.trim());
   const searching = settled.length > 0;
-  const search = useQuery(searchQuery(api, settled));
+  const search = useQuery(searchQuery(api, settled, bootstrapped));
 
   // `isPending` is true for a disabled query too, so it cannot stand in for "loading" here;
   // `isFetching` is what actually distinguishes a request in flight.
@@ -234,6 +242,22 @@ export default function SavedScreen() {
         <View style={styles.centre}>
           <ActivityIndicator accessibilityLabel={t('common.loading')} color={theme.color.accent} />
         </View>
+      ) : !searching && isError ? (
+        // A failed fetch is not an empty library. Saying 「まだ保存した論文はありません」 to a
+        // reader whose library is full tells them their saves are gone.
+        <View style={[styles.centre, { gap: theme.spacing.sm, padding: theme.spacing.xl }]}>
+          <Text variant="label" tone="warning" style={{ textAlign: 'center' }}>
+            {t('saved.loadFailed')}
+          </Text>
+          <Text variant="caption" tone="secondary" style={{ textAlign: 'center' }}>
+            {t('saved.loadFailedHint')}
+          </Text>
+          <PressableRow onPress={() => void refetch()} accessibilityLabel={t('common.retry')}>
+            <Text variant="body" tone="accent">
+              {t('common.retry')}
+            </Text>
+          </PressableRow>
+        </View>
       ) : rows.length === 0 ? (
         // "Searched and found nothing" and "saved nothing yet" are different situations and
         // the second wording ("swipe right in Discover") is wrong advice for the first.
@@ -330,6 +354,15 @@ export default function SavedScreen() {
                   </Text>
                 </PressableRow>
                 <PressableRow
+                  onPress={() => setSharing(item)}
+                  accessibilityLabel={`${t('share.open')}: ${item.paper.title}`}
+                  style={{ flex: 1 }}
+                >
+                  <Text variant="caption" tone="accent">
+                    {t('share.open')}
+                  </Text>
+                </PressableRow>
+                <PressableRow
                   onPress={() => void remove(item.savedPaper.paperId)}
                   accessibilityLabel={`${t('saved.remove')}: ${item.paper.title}`}
                   style={{ flex: 1 }}
@@ -341,6 +374,16 @@ export default function SavedScreen() {
               </View>
             </View>
           )}
+        />
+      )}
+
+      {sharing !== null && (
+        <ShareSheet
+          visible
+          paper={sharing.paper}
+          saved={sharing.savedPaper}
+          locale={locale}
+          onClose={() => setSharing(null)}
         />
       )}
     </View>

@@ -62,9 +62,14 @@ export function createQueryClient(): QueryClient {
   });
 }
 
-export function savedQuery(api: ApiClient, sort: string) {
+export function savedQuery(api: ApiClient, sort: string, enabled = true) {
   return {
     queryKey: queryKeys.saved(sort),
+    // The token is read asynchronously at start-up (see `SessionProvider`), so a cold start
+    // straight into this screen would otherwise send the request without one. The 401 came
+    // back as an empty list and the screen said 「まだ保存した論文はありません」 to a reader
+    // whose library was full.
+    enabled,
     queryFn: async (): Promise<Offlineable<{ saved: SavedEntry[]; total: number }>> => {
       try {
         const response = await api.saved({ sort: sort as never, limit: 50 });
@@ -95,12 +100,12 @@ export function savedQuery(api: ApiClient, sort: string) {
  * asked yet" — the check exists in both places because the client one saves a round trip
  * and the server one is the definition.
  */
-export function searchQuery(api: ApiClient, query: string) {
+export function searchQuery(api: ApiClient, query: string, ready = true) {
   const trimmed = query.trim();
   return {
     queryKey: queryKeys.search(trimmed),
     queryFn: () => api.searchSaved(trimmed),
-    enabled: trimmed.length > 0,
+    enabled: trimmed.length > 0 && ready,
   };
 }
 
