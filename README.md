@@ -208,6 +208,19 @@ make format      # 両言語の自動整形
 
 DB が無い環境では統合テストと E2E テストは失敗ではなく **skip** され、起動方法が理由に表示されます。
 
+### 見た目の回帰テスト
+
+```bash
+npm run web              # 別のターミナルで web ビルドを起動しておく
+npm run visual           # 8 条件を撮ってベースラインと画素比較
+npm run visual:update    # 変更を意図したものとして受け入れる
+```
+
+`/dev/visual` に部品を並べたギャラリーがあり、ライト/ダーク・320/390/820px・Dynamic Type 1.0/1.5/2.0・
+Reduce Motion・日英の 8 条件で撮ります。**内容は固定の定数、描くのは出荷されるコンポーネント**です
+（DECISIONS.md D-044）。ベースラインはフォントのラスタライズに依存するため `npm run ci` には
+入れていません。差分が出たら `apps/mobile/visual-output/` に実物と差分画像が出ます。
+
 現在: Python 449 件 / TypeScript 131 件。
 
 | 種別 | 対象 |

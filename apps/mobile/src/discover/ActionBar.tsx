@@ -95,7 +95,14 @@ export function ActionBar({
             styles.button,
             {
               minHeight: theme.touchTarget,
+              // `minWidth` only, with no cap, pushed the row past the screen edge at 2×
+              // Dynamic Type: the left button was cut off and the right one hung outside.
+              // These buttons are the non-gesture equivalent of the swipes (spec section
+              // 20), so they are the last thing that may become unreachable. `flexShrink`
+              // lets a button give up width, and the row wraps once shrinking is not
+              // enough. Found by the visual-regression matrix, not by hand.
               minWidth: theme.touchTarget * 1.6,
+              flexShrink: 1,
               borderRadius: theme.radius.chip,
               borderColor: theme.color.border,
               backgroundColor: theme.color.card,
@@ -117,6 +124,7 @@ export function ActionBar({
 const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'center',
     alignItems: 'center',
   },

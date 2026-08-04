@@ -37,3 +37,7 @@ coverage.xml
 # Written by `expo start` if it is ever run from the repository root by mistake. The
 # workspaces extend tsconfig.base.json; a root tsconfig.json here is litter, not config.
 /tsconfig.json
+
+# Written by `npm run visual` when a case differs: the current rendering and a diff image.
+# The baselines next to it are committed; these are the evidence for one failing run.
+/apps/mobile/visual-output/

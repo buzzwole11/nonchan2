@@ -103,8 +103,14 @@
       **オフライン時のフォールバックは queryFn の中**に置いたので、AsyncStorage キャッシュは
       そのまま（DECISIONS.md D-040）。翻訳シートだけは query ではなく mutation
       （`POST /translations` は行を作る書き込み）
-- [ ] Maestro による E2E（オンボーディング / スワイプ / Undo / 範囲選択翻訳 / オフライン / VoiceOver 操作）
-- [ ] Visual regression（light・dark / 小画面・大画面 / 日本語長文 / Dynamic Type / Reduce Motion）
+- [ ] **Maestro による E2E**（オンボーディング / スワイプ / Undo / 範囲選択翻訳 / オフライン /
+      VoiceOver 操作）— 実機かエミュレータが要るため、この環境では実行できない（D-030）。
+      web ハーネスでのフロー確認は Playwright で行っている
+- [x] **Visual regression**（`/dev/visual` + `scripts/visual-regression.mjs`、`npm run visual`）—
+      8 条件（light/dark・320/390/820px・Dynamic Type 1.0/1.5/2.0・Reduce Motion・日英）を
+      画素比較。**内容は固定の定数、描くのは出荷されるコンポーネント**（DECISIONS.md D-044）。
+      初回実行で **Dynamic Type 2.0 で操作ボタンが画面外にはみ出す**のを検出し、修正済み。
+      ベースラインはフォントのラスタライズに依存するので `npm run ci` には入れていない
 
 ---
 
