@@ -1,9 +1,12 @@
 /**
- * Canvas: the Knowledge Canvas (spec section 13).
+ * The Canvas view of the saved library (spec sections 13, 14).
  *
- * The other half of section 14's pair — Saved is the orderly list, this is the plane you
- * look at. Positions come from the server and are never adjusted here; see
- * `src/canvas/CanvasPlane.tsx` for why that matters.
+ * Not a tab of its own. Section 14 makes Canvas and Library two *views of the same data*
+ * with a switch between them — 「SavedをLibraryまたはCanvasで閲覧」 — and section 1 asks for
+ * the two to be 滑らかに切り替えられる. Two separate tabs would have made them two places
+ * holding the same papers, which is a different product.
+ *
+ * Positions come from the server and are never adjusted here; see `CanvasPlane.tsx`.
  *
  * **Zoom is a stepped control, not only a pinch.** Section 13 describes zoom levels and
  * section 20 requires a non-gesture equivalent for every gesture, so the buttons are the
@@ -22,19 +25,31 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { CanvasTile } from '@papermatch/shared-types';
 
-import { canvasQuery, queryKeys } from '../../src/api/queries';
-import { useSession } from '../../src/api/session';
-import { CanvasPlane, fieldsOnPlane } from '../../src/canvas/CanvasPlane';
-import { Chip } from '../../src/components/Chip';
-import { PressableRow } from '../../src/components/PressableRow';
-import { Text } from '../../src/components/Text';
-import { type MessageKey, translate } from '../../src/i18n';
-import { useTheme } from '../../src/theme/ThemeProvider';
+import { canvasQuery, queryKeys } from '../api/queries';
+import { useSession } from '../api/session';
+import { CanvasPlane, fieldsOnPlane } from './CanvasPlane';
+import { Chip } from '../components/Chip';
+import { PressableRow } from '../components/PressableRow';
+import { Text } from '../components/Text';
+import { type MessageKey, translate } from '../i18n';
+import { useTheme } from '../theme/ThemeProvider';
 
 /** Section 13's zoom levels: 遠景 / 中景 / 近景 / 最接近. */
 const ZOOM_STEPS = [1, 2.6, 4.6, 7.5] as const;
 
-export default function CanvasScreen() {
+export interface CanvasViewProps {
+  /**
+   * The paper the reader has selected, shared with the Library view.
+   *
+   * Section 14 asks that switching between the two 位置関係を失わない — so the selection is
+   * owned by the screen and handed to whichever view is showing, rather than each view
+   * keeping its own and losing the reader's place at the switch.
+   */
+  selectedId: string | null;
+  onSelectedChange: (paperId: string | null) => void;
+}
+
+export function CanvasView({ selectedId, onSelectedChange }: CanvasViewProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -42,7 +57,6 @@ export default function CanvasScreen() {
   const queryClient = useQueryClient();
 
   const [zoomIndex, setZoomIndex] = useState(0);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [fieldFilter, setFieldFilter] = useState<string | null>(null);
 
   const locale: 'ja' | 'en' = (user?.settings.locale ?? 'ja').startsWith('en') ? 'en' : 'ja';
@@ -62,7 +76,7 @@ export default function CanvasScreen() {
   const scale = ZOOM_STEPS[zoomIndex] ?? 1;
 
   function select(tile: CanvasTile): void {
-    setSelectedId((current) => (current === tile.entityId ? null : tile.entityId));
+    onSelectedChange(selectedId === tile.entityId ? null : tile.entityId);
   }
 
   async function place(tile: CanvasTile, x: number, y: number): Promise<void> {
@@ -102,19 +116,17 @@ export default function CanvasScreen() {
     <ScrollView
       style={{ flex: 1, backgroundColor: theme.color.background }}
       contentContainerStyle={{
-        paddingTop: insets.top + theme.spacing.md,
         paddingBottom: insets.bottom + theme.spacing.xxl,
         gap: theme.spacing.sm,
       }}
     >
-      <View style={{ paddingHorizontal: theme.spacing.screenHorizontal, gap: theme.spacing.xs }}>
-        <Text variant="label" accessibilityRole="header">
-          {t('canvas.title')}
-        </Text>
-        <Text variant="caption" tone="secondary">
-          {t('canvas.count', { count: tiles.length, fields: fields.length })}
-        </Text>
-      </View>
+      <Text
+        variant="caption"
+        tone="secondary"
+        style={{ paddingHorizontal: theme.spacing.screenHorizontal }}
+      >
+        {t('canvas.count', { count: tiles.length, fields: fields.length })}
+      </Text>
 
       <CanvasPlane
         tiles={tiles}
@@ -234,7 +246,7 @@ export default function CanvasScreen() {
               </Text>
             </PressableRow>
             <PressableRow
-              onPress={() => setSelectedId(null)}
+              onPress={() => onSelectedChange(null)}
               accessibilityLabel={t('canvas.clearSelection')}
               style={{ flex: 1 }}
             >
