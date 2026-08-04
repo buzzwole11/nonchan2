@@ -239,8 +239,14 @@ AI が要る項目は環境制約で未着手です（DECISIONS.md D-024）。
 
 ## Phase 5 — 自動数式パイプライン
 
-- [ ] `FullTextProvider`（許諾済み LaTeX / XML のみ）
-- [ ] 式・定義・仮定の抽出、記号表の構築
+- [x] **`FullTextProvider`**（`providers/base.py` の `FullTextRecord`、`mock_fulltext.py`、
+      `services/fulltext.py`）— **本文のライセンスは論文メタデータのライセンスではない**
+      （arXiv はメタデータ CC0、本文は著者のライセンス）。既定は拒否で、許可リストに
+      無いものは実行時に調べず拒否する（DECISIONS.md D-045）
+- [x] **式・定義・仮定の抽出、記号表の構築**（`text/latex_document.py`）— display 数式・
+      式番号（著者の `\tag` のみ。こちらで採番しない）・前後の段落・`\ref` の解決・
+      definition/assumption 環境・「where $x$ is ...」からの記号表。
+      すべて `source_exact` で、主張は一切しない
 - [ ] 中間変形候補の生成
 - [ ] `MathVerifier`（数式処理 / 数値代入 / 次元解析 / 極限）
 - [ ] 検証状態の付与と、未検証の既定非表示

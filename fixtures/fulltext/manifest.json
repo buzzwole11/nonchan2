@@ -1,0 +1,38 @@
+{
+  "$meta": {
+    "note": "Synthetic LaTeX sources for the maths pipeline (spec section 12). Structure taken from public LaTeX conventions; content written for this repository. CC0-1.0.",
+    "licenceField": "`licenseId` here is the licence of the BODY, not of the paper's metadata (spec section 21). arXiv metadata is CC0 while the manuscript is under the author's licence — conflating the two is the mistake the gate exists to prevent."
+  },
+  "documents": [
+    {
+      "canonicalId": "arXiv:2601.00001",
+      "file": "permissive.tex",
+      "bodyFormat": "latex",
+      "licenseId": "CC-BY-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "sourceUrl": "https://example.invalid/abs/2601.00001",
+      "version": "v1",
+      "expect": "permitted"
+    },
+    {
+      "canonicalId": "arXiv:2601.00002",
+      "file": "arxiv-licence.tex",
+      "bodyFormat": "latex",
+      "licenseId": "arXiv-1.0",
+      "licenseUrl": "https://arxiv.org/licenses/nonexclusive-distrib/1.0/",
+      "sourceUrl": "https://example.invalid/abs/2601.00002",
+      "version": "v2",
+      "expect": "refused_licence"
+    },
+    {
+      "canonicalId": "arXiv:2601.00003",
+      "file": "arxiv-licence.tex",
+      "bodyFormat": "latex",
+      "licenseId": null,
+      "licenseUrl": null,
+      "sourceUrl": "https://example.invalid/abs/2601.00003",
+      "version": "v1",
+      "expect": "unknown_licence"
+    }
+  ]
+}

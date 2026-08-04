@@ -26,6 +26,7 @@ __all__ = [
     "EmbeddingProvider",
     "ExplanationProvider",
     "FullTextProvider",
+    "FullTextRecord",
     "MathVerifier",
     "PaperProvider",
     "PaperQuery",
@@ -236,19 +237,50 @@ class MathVerifier(Protocol):
     def health(self) -> ProviderHealth: ...
 
 
+@dataclass(frozen=True)
+class FullTextRecord:
+    """A paper's body, with the licence that covers *the body* (spec sections 12, 21).
+
+    **The body's licence is its own field and not the paper's.** For arXiv the metadata is
+    CC0 while the manuscript carries whatever licence the author chose — often arXiv's
+    non-exclusive distribution licence, which permits redistribution by arXiv and says
+    nothing about a third party parsing the source. Reusing ``Paper.license_id`` here would
+    read "CC0" off the metadata and let every arXiv paper through, which is precisely the
+    mistake section 21's ライセンス不明の本文断片を数式カード化しない forbids.
+
+    ``license_id`` of ``None`` means *unknown*, never *permissive*. A provider that cannot
+    name the licence must say so rather than omitting the field.
+    """
+
+    canonical_id: str
+    #: ``latex`` or ``jats_xml``. Section 12 accepts LaTeX source or structured XML.
+    body_format: str
+    body: str
+    #: SPDX id where possible, or the publisher's own string. ``None`` means unknown.
+    license_id: str | None
+    license_url: str | None
+    source_url: str
+    retrieved_at: datetime
+    version: str | None = None
+    #: Everything the provider returned, so a re-parse never needs a re-fetch.
+    raw_metadata: dict[str, Any] = field(default_factory=dict)
+
+
 @runtime_checkable
 class FullTextProvider(Protocol):
     """Full text or LaTeX source, only for papers whose terms permit it.
 
     Spec section 12 restricts the maths pipeline to documents whose licence has been
     checked; spec section 21 forbids scraping publisher sites. Implementations must
-    return ``None`` rather than guessing when the terms are unknown.
+    return ``None`` rather than guessing when the terms are unknown — and returning a
+    record is not permission on its own, because the licence gate
+    (``services.fulltext.licence_decision``) is what decides whether the body may be used.
     """
 
     name: str
 
     @abstractmethod
-    def fetch_source(self, canonical_id: str) -> dict[str, Any] | None: ...
+    def fetch_source(self, canonical_id: str) -> FullTextRecord | None: ...
 
     @abstractmethod
     def health(self) -> ProviderHealth: ...

@@ -12,13 +12,20 @@ from typing import TypeVar
 
 from papermatch_api.config import Settings, get_settings
 from papermatch_api.providers.arxiv import ArxivPaperProvider
-from papermatch_api.providers.base import PaperProvider, ProviderHealth, TranslationProvider
+from papermatch_api.providers.base import (
+    FullTextProvider,
+    PaperProvider,
+    ProviderHealth,
+    TranslationProvider,
+)
+from papermatch_api.providers.mock_fulltext import MockFullTextProvider
 from papermatch_api.providers.mock_paper import MockPaperProvider
 from papermatch_api.providers.mock_translation import MockTranslationProvider
 from papermatch_api.providers.openalex import OpenAlexPaperProvider
 
 PaperProviderFactory = Callable[[Settings], PaperProvider]
 TranslationProviderFactory = Callable[[Settings], TranslationProvider]
+FullTextProviderFactory = Callable[[Settings], FullTextProvider]
 
 PAPER_PROVIDERS: dict[str, PaperProviderFactory] = {
     "mock": lambda settings: MockPaperProvider(settings.fixtures_dir),
@@ -30,6 +37,14 @@ PAPER_PROVIDERS: dict[str, PaperProviderFactory] = {
 
 TRANSLATION_PROVIDERS: dict[str, TranslationProviderFactory] = {
     "mock": lambda _settings: MockTranslationProvider(),
+}
+
+# Only a fixture source so far. arXiv serves e-print sources, but section 21 forbids using
+# them without checking the manuscript's own licence, and that check is per paper rather
+# than per provider — so an `arxiv_fulltext` entry here would still go through the same
+# gate in `services/fulltext.py`.
+FULLTEXT_PROVIDERS: dict[str, FullTextProviderFactory] = {
+    "mock": lambda settings: MockFullTextProvider(settings.fixtures_dir),
 }
 
 
@@ -58,10 +73,17 @@ def get_translation_provider() -> TranslationProvider:
     return _resolve(TRANSLATION_PROVIDERS, settings.translation_provider, settings, "translation")
 
 
+@lru_cache(maxsize=1)
+def get_fulltext_provider() -> FullTextProvider:
+    settings = get_settings()
+    return _resolve(FULLTEXT_PROVIDERS, settings.fulltext_provider, settings, "fulltext")
+
+
 def reset_providers() -> None:
     """Drop cached instances. Used by tests that change configuration."""
     get_paper_provider.cache_clear()
     get_translation_provider.cache_clear()
+    get_fulltext_provider.cache_clear()
 
 
 def health_snapshot() -> dict[str, ProviderHealth]:

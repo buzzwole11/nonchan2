@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     # Provider selection (spec section 22: everything external is swappable).
     paper_provider: str = "mock"
     translation_provider: str = "mock"
+    #: Section 12 restricts the maths pipeline to licensed sources; see services/fulltext.py.
+    fulltext_provider: str = "mock"
 
     #: Sent on every outbound request. Spec section 21 asks that provider terms and
     #: acknowledgements be respected, and arXiv asks callers to identify themselves.
