@@ -51,6 +51,13 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="canvas"
+        options={{
+          title: translate('ja', 'nav.canvas'),
+          tabBarIcon: ({ focused }) => <TabIcon glyph="◇" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
         name="learn"
         options={{
           title: translate('ja', 'nav.learn'),

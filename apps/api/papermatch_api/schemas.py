@@ -652,3 +652,37 @@ class MathCardListResponse(CamelModel):
 
 class EquationListResponse(CamelModel):
     equations: list[EquationOut]
+
+
+# ---------------------------------------------------------------- canvas (section 13)
+
+
+class CanvasTileOut(CamelModel):
+    """One tile on the plane.
+
+    Carries the paper itself rather than only its id: the Canvas draws a title at close
+    zoom and needs the field weights to colour the tile, and a second round trip per tile
+    to fetch those would make the plane arrive in pieces.
+    """
+
+    entity_type: str
+    entity_id: uuid.UUID
+    x: float
+    y: float
+    cluster_id: str | None
+    #: 0..1, already log-compressed (spec section 13: サイズは対数圧縮).
+    weight: float
+    #: True when the reader dragged this tile; a re-layout must not move it.
+    user_override: bool
+    paper: PaperOut
+
+
+class CanvasResponse(CamelModel):
+    tiles: list[CanvasTileOut]
+    #: Which placement algorithm produced these coordinates (section 13).
+    layout_version: str
+
+
+class MoveTileRequest(CamelModel):
+    x: float
+    y: float

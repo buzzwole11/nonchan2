@@ -16,6 +16,7 @@ from papermatch_api import __version__
 from papermatch_api.config import get_settings
 from papermatch_api.routers import (
     auth,
+    canvas,
     equations,
     feed,
     fields,
@@ -105,6 +106,7 @@ def create_app() -> FastAPI:
         translations.router,
         learn.router,
         equations.router,
+        canvas.router,
     ):
         app.include_router(router)
 

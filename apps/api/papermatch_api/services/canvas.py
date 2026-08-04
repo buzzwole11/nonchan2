@@ -28,6 +28,21 @@ a neighbour-embedding method would find are not there to be found.
 of the above.** So placement quantises to a grid and claims the nearest *free* cell. A new
 tile can only ever take a cell nobody holds, so nothing is displaced — the packing is
 tight and no existing tile moves.
+
+**Islands come from the taxonomy, not from a hash of the field id.** Hashing to an angle
+was the first attempt and it produced islands sitting on top of each other: measured over
+the fourteen seeded fields, sixteen of the ninety-one pairs overlapped and `cond-mat` was
+one unit from `math.NT`. Independent angles on a circle collide — the birthday problem —
+and a plane whose islands overlap is lying about the grouping it exists to show. So a
+top-level field takes an evenly spaced slot on the ring and its children sit in a smaller
+ring around it. That is separated by construction, and closer to what section 13 means by
+分野島: physics is one island with high-energy theory and condensed matter as
+neighbourhoods inside it.
+
+The cost is that anchors depend on the taxonomy's shape, so **changing the taxonomy is a
+layout change**. That is exactly what section 13's 配置アルゴリズムの版を保持 is for:
+positions are keyed by `layout_version`, so a taxonomy edit means bumping the version and
+the old plane survives beside the new one rather than being silently rewritten.
 """
 
 from __future__ import annotations
@@ -35,12 +50,20 @@ from __future__ import annotations
 import hashlib
 import math
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from papermatch_api.models import CanvasPosition, Embedding, Paper, SavedPaper, User
+from papermatch_api.models import (
+    CanvasPosition,
+    Embedding,
+    Field,
+    Paper,
+    SavedPaper,
+    User,
+)
 
 __all__ = [
     "GRID_STEP",
@@ -50,6 +73,7 @@ __all__ = [
     "layout_for",
     "personal_weight",
     "project",
+    "taxonomy_map",
     "tile_size",
 ]
 
@@ -68,7 +92,17 @@ _ANCHOR_RADIUS = 24.0
 #: How far a paper may sit from its field's anchor. Bounded so a paper never drifts into
 #: a neighbouring island — the island *is* the field, and a tile in the wrong one is a
 #: worse lie than a tile in a slightly wrong place within the right one.
-_SPREAD = 7.0
+_SPREAD = 3.0
+
+#: The fewest slots a ring is divided into. With only three disciplines, dividing the
+#: circle into a fixed twelve put them at 0°, 30° and 60° — all in one quadrant, with
+#: their subfield rings overlapping. Spacing is therefore over the actual count, with this
+#: as a floor so two siblings are never placed on opposite sides of a tiny ring.
+_MIN_RING_SLOTS = 3
+
+#: How far a subfield sits from its discipline's centre. Larger than `_SPREAD` so
+#: neighbourhoods within an island stay apart, and small enough that they stay inside it.
+_CHILD_RADIUS = 8.0
 
 #: Seeds the projection basis. A constant, never the data: a basis derived from the corpus
 #: would shift as the corpus grew, which is the failure this module exists to avoid.
@@ -97,20 +131,54 @@ def _hash_unit(text: str, salt: str) -> float:
     return int.from_bytes(digest[:8], "big") / float(1 << 64)
 
 
-def field_anchor(field_id: str | None) -> tuple[float, float]:
+def _slot_angle(index: int, count: int) -> float:
+    """Evenly spread ``count`` items around a circle.
+
+    Over the actual count rather than a fixed number of slots: three items in a
+    twelve-slot ring occupy a quarter of it and crowd, which is what made the first
+    version's islands overlap.
+    """
+    return math.tau * index / max(count, _MIN_RING_SLOTS)
+
+
+def taxonomy_map(session: Session) -> dict[str, str | None]:
+    """Field id to parent id, which is what `field_anchor` needs to build the islands."""
+    return {field.id: field.parent_id for field in session.execute(select(Field)).scalars()}
+
+
+def field_anchor(
+    field_id: str | None, taxonomy: Mapping[str, str | None] | None = None
+) -> tuple[float, float]:
     """The centre of a field's island.
 
-    Derived from the field id alone, so it is the same on every device and in every run,
-    and a field that gains its first paper does not push the other islands aside. Papers
-    with no field share one anchor rather than being scattered: "we do not know" is one
-    place, not a hundred.
+    With a ``taxonomy`` — field id to parent id — a discipline takes an evenly spaced slot
+    on the ring and a subfield sits in a smaller ring around its parent. Islands are then
+    separated by construction, and a subfield is visibly *inside* its discipline.
+
+    Without one, or for a field the taxonomy has never heard of, the id is hashed. That is
+    the older behaviour and it is fine for the rare stray, but it is not good enough as
+    the general rule: independent hashed angles collide, and colliding islands misreport
+    the grouping.
+
+    Papers with no field at all share one anchor rather than being scattered: "we do not
+    know" is one place, not a hundred.
     """
     key = field_id or "__unknown__"
-    angle = _hash_unit(key, "angle") * math.tau
-    # Two rings rather than one circle: with many fields a single ring crowds, and a
-    # deterministic split keeps islands apart without consulting how many exist.
-    radius = _ANCHOR_RADIUS * (0.55 if _hash_unit(key, "ring") < 0.5 else 1.0)
-    return (radius * math.cos(angle), radius * math.sin(angle))
+    if taxonomy is None or key not in taxonomy:
+        angle = _hash_unit(key, "angle") * math.tau
+        radius = _ANCHOR_RADIUS * (0.55 if _hash_unit(key, "ring") < 0.5 else 1.0)
+        return (radius * math.cos(angle), radius * math.sin(angle))
+
+    parent = taxonomy.get(key)
+    if parent is None:
+        roots = sorted(name for name, owner in taxonomy.items() if owner is None)
+        angle = _slot_angle(roots.index(key), len(roots))
+        return (_ANCHOR_RADIUS * math.cos(angle), _ANCHOR_RADIUS * math.sin(angle))
+
+    parent_x, parent_y = field_anchor(parent, taxonomy)
+    siblings = sorted(name for name, owner in taxonomy.items() if owner == parent)
+    angle = _slot_angle(siblings.index(key), len(siblings))
+    return (parent_x + _CHILD_RADIUS * math.cos(angle), parent_y + _CHILD_RADIUS * math.sin(angle))
 
 
 def _basis(dimensions: int) -> tuple[list[float], list[float]]:
@@ -159,8 +227,14 @@ def personal_weight(saved: SavedPaper, *, visits: int = 0) -> float:
     return min(1.0, math.log1p(raw) / math.log1p(_WEIGHT_SATURATION))
 
 
-def tile_size(weight: float, *, minimum: float = 0.6, maximum: float = 1.6) -> float:
-    """Tile edge length as a multiple of the grid step."""
+def tile_size(weight: float, *, minimum: float = 0.45, maximum: float = 0.95) -> float:
+    """Tile edge length as a fraction of the grid step.
+
+    **Never above 1.** Placement guarantees distinct *cells*, so a tile wider than its cell
+    overlaps its neighbour no matter how carefully it was placed — which is what the first
+    version did, and the plane came out with tiles sitting on top of each other despite the
+    layout being correct. Capping below 1 is what makes the mosaic a mosaic.
+    """
     return minimum + (maximum - minimum) * max(0.0, min(1.0, weight))
 
 
@@ -231,11 +305,13 @@ def layout_for(session: Session, user: User, *, limit: int = 500) -> list[Placed
         ).scalars()
     }
 
+    taxonomy = taxonomy_map(session)
+
     tiles: list[PlacedTile] = []
     for saved, paper in rows:
         position = existing.get(paper.id)
         if position is None:
-            anchor_x, anchor_y = field_anchor(paper.primary_field_id)
+            anchor_x, anchor_y = field_anchor(paper.primary_field_id, taxonomy)
             offset_x, offset_y = project(vectors.get(paper.id, []))
             column, row = _spiral(
                 _cell(anchor_x + offset_x * _SPREAD, anchor_y + offset_y * _SPREAD), taken

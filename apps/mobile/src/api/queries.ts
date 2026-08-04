@@ -38,6 +38,7 @@ export interface Offlineable<T> {
 export const queryKeys = {
   saved: (sort: string) => ['saved', sort] as const,
   search: (query: string) => ['search', query] as const,
+  canvas: () => ['canvas'] as const,
   expressions: () => ['expressions'] as const,
   review: () => ['review'] as const,
   mathCards: () => ['math-cards'] as const,
@@ -100,6 +101,20 @@ export function searchQuery(api: ApiClient, query: string) {
     queryKey: queryKeys.search(trimmed),
     queryFn: () => api.searchSaved(trimmed),
     enabled: trimmed.length > 0,
+  };
+}
+
+/**
+ * The Canvas plane (spec section 13).
+ *
+ * No offline fallback: the plane's coordinates are created on the server the first time a
+ * paper is placed, so there is nothing meaningful to serve from a cache that has never
+ * seen them. Saved is the surface that works without a connection.
+ */
+export function canvasQuery(api: ApiClient) {
+  return {
+    queryKey: queryKeys.canvas(),
+    queryFn: () => api.canvas(),
   };
 }
 

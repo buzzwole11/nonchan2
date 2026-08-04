@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { parseHex } from './contrast.ts';
+import { contrastRatio, parseHex } from './contrast.ts';
 import {
   FIELD_BASE_COLORS,
   UNKNOWN_FIELD_COLOR,
@@ -9,6 +9,9 @@ import {
   fieldColor,
   hexToOklab,
   oklabToHex,
+  readableOn,
+  TILE_INK_DARK,
+  TILE_INK_LIGHT,
 } from './fieldColor.ts';
 
 test('a round trip through Oklab returns the colour it started with', () => {
@@ -127,4 +130,22 @@ test('a blend is always a valid colour', () => {
       assert.match(blendFieldColors({ [first]: 2, [second]: 1 }), /^#[0-9a-f]{6}$/);
     }
   }
+});
+
+test('a tile label is legible on every field colour', () => {
+  // Spec section 20. Field colours span a wide lightness range on purpose — `stat` is a
+  // bright amber — and fixing the label to white fails WCAG on the light end, putting the
+  // one label that names the field out of reach of the readers most likely to need it.
+  for (const hex of [...Object.values(FIELD_BASE_COLORS), UNKNOWN_FIELD_COLOR]) {
+    const ink = readableOn(hex);
+    assert.ok(
+      contrastRatio(ink, hex) >= 3,
+      `${hex}: ink ${ink} only reaches ${contrastRatio(ink, hex).toFixed(2)}:1`,
+    );
+  }
+});
+
+test('the ink flips rather than staying white on a light field', () => {
+  assert.equal(readableOn(FIELD_BASE_COLORS['stat'] as string), TILE_INK_DARK);
+  assert.equal(readableOn(FIELD_BASE_COLORS['hep-th'] as string), TILE_INK_LIGHT);
 });

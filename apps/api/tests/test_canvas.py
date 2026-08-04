@@ -23,6 +23,7 @@ from papermatch_api.services.canvas import (
     move_tile,
     personal_weight,
     project,
+    taxonomy_map,
     tile_size,
 )
 from tests.conftest import requires_db
@@ -89,6 +90,43 @@ def test_the_projection_depends_only_on_the_vector() -> None:
 def test_a_field_anchor_is_the_same_every_time() -> None:
     assert field_anchor("math.PR") == field_anchor("math.PR")
     assert field_anchor("math.PR") != field_anchor("hep-th")
+
+
+def test_no_two_field_islands_overlap(seeded_db: Session) -> None:
+    """Hashing the field id to an angle put islands on top of each other.
+
+    Independent angles on a circle collide — the birthday problem. Measured over the
+    seeded taxonomy the first version overlapped sixteen of ninety-one pairs, with
+    `cond-mat` one unit from `math.NT`, and a plane whose islands overlap misreports the
+    grouping it exists to show.
+    """
+    taxonomy = taxonomy_map(seeded_db)
+    assert len(taxonomy) >= 10, "the seeded taxonomy should have enough fields to crowd"
+
+    anchors = {field: field_anchor(field, taxonomy) for field in sorted(taxonomy)}
+    names = sorted(anchors)
+
+    for index, first in enumerate(names):
+        for second in names[index + 1 :]:
+            distance = math.dist(anchors[first], anchors[second])
+            if taxonomy[first] == second or taxonomy[second] == first:
+                # A discipline and its own subfield are meant to be close.
+                continue
+            assert distance >= 2 * 3.0, f"{first} and {second} overlap ({distance:.1f})"
+
+
+def test_a_subfield_sits_inside_its_discipline(seeded_db: Session) -> None:
+    taxonomy = taxonomy_map(seeded_db)
+    children = [name for name, parent in taxonomy.items() if parent is not None]
+    assert children
+
+    for child in children:
+        parent = taxonomy[child]
+        assert parent is not None
+        near = math.dist(field_anchor(child, taxonomy), field_anchor(parent, taxonomy))
+        far = math.dist(field_anchor(child, taxonomy), (0.0, 0.0))
+        # Nearer to its own discipline's centre than to the middle of the plane.
+        assert near < far
 
 
 def test_papers_with_no_field_share_one_anchor() -> None:
@@ -240,7 +278,70 @@ def test_weight_never_leaves_the_unit_interval(seeded_db: Session, reader: User)
 
 
 def test_tile_size_is_bounded_at_both_ends() -> None:
-    assert tile_size(0.0) == pytest.approx(0.6)
-    assert tile_size(1.0) == pytest.approx(1.6)
-    assert tile_size(-5.0) == pytest.approx(0.6)
-    assert tile_size(5.0) == pytest.approx(1.6)
+    assert tile_size(0.0) == pytest.approx(0.45)
+    assert tile_size(1.0) == pytest.approx(0.95)
+    assert tile_size(-5.0) == pytest.approx(0.45)
+    assert tile_size(5.0) == pytest.approx(0.95)
+
+
+def test_a_tile_never_grows_wider_than_its_cell() -> None:
+    """Placement guarantees distinct cells; a tile wider than one overlaps regardless.
+
+    The first version sized tiles independently of the grid and the plane came out with
+    tiles on top of each other while the layout underneath was perfectly correct.
+    """
+    for step in range(0, 21):
+        assert tile_size(step / 20) < 1.0
+
+
+# ------------------------------------------------------------------ through the endpoint
+
+
+def _auth(client) -> dict[str, str]:  # type: ignore[no-untyped-def]
+    response = client.post("/auth/guest", json={"locale": "ja-JP", "timezone": "Asia/Tokyo"})
+    assert response.status_code == 201, response.text
+    return {"Authorization": f"Bearer {response.json()['accessToken']}"}
+
+
+def test_the_endpoint_returns_an_empty_plane_for_an_empty_library(client) -> None:  # type: ignore[no-untyped-def]
+    body = client.get("/canvas", headers=_auth(client)).json()
+
+    assert body["tiles"] == []
+    assert body["layoutVersion"] == LAYOUT_VERSION
+
+
+def test_the_endpoint_places_saved_papers(client, seeded_db: Session) -> None:  # type: ignore[no-untyped-def]
+    headers = _auth(client)
+    papers = _papers(seeded_db, 4)
+    for paper in papers:
+        client.post(f"/saved/{paper.id}", json={"reasons": ["interesting"]}, headers=headers)
+
+    body = client.get("/canvas", headers=headers).json()
+
+    assert len(body["tiles"]) == 4
+    assert all(tile["paper"]["title"] for tile in body["tiles"])
+    # Colouring a tile needs the weights, so they must arrive with the plane rather than
+    # in a second round trip per tile.
+    assert all("fieldWeights" in tile["paper"] for tile in body["tiles"])
+
+
+def test_the_endpoint_records_a_move(client, seeded_db: Session) -> None:  # type: ignore[no-untyped-def]
+    headers = _auth(client)
+    paper = _papers(seeded_db, 1)[0]
+    client.post(f"/saved/{paper.id}", json={"reasons": ["interesting"]}, headers=headers)
+
+    body = client.patch(f"/canvas/{paper.id}", json={"x": 12.5, "y": -3.5}, headers=headers).json()
+
+    tile = next(t for t in body["tiles"] if t["entityId"] == str(paper.id))
+    assert (tile["x"], tile["y"]) == (12.5, -3.5)
+    assert tile["userOverride"] is True
+
+
+def test_a_paper_outside_the_library_cannot_be_placed(client, seeded_db: Session) -> None:  # type: ignore[no-untyped-def]
+    # A tile only exists for a paper this reader saved; placing one for anything else
+    # would put a paper on their plane that is not in their library.
+    paper = _papers(seeded_db, 1)[0]
+
+    response = client.patch(f"/canvas/{paper.id}", json={"x": 1.0, "y": 1.0}, headers=_auth(client))
+
+    assert response.status_code == 404

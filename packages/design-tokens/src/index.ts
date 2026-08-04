@@ -14,6 +14,9 @@ export {
   fieldColor,
   hexToOklab,
   oklabToHex,
+  readableOn,
+  TILE_INK_DARK,
+  TILE_INK_LIGHT,
   type Oklab,
 } from './fieldColor.ts';
 

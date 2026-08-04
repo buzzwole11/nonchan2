@@ -355,3 +355,34 @@ export interface ReportResponse {
   /** True when this replaced the reader's earlier report of the same problem. */
   alreadyReported: boolean;
 }
+
+/**
+ * One tile on the Knowledge Canvas (spec section 13).
+ *
+ * The paper travels with the tile because the plane draws a title at close zoom and
+ * colours the tile from the field weights; fetching those per tile would make the plane
+ * arrive in pieces.
+ */
+export interface CanvasTile {
+  entityType: string;
+  entityId: Uuid;
+  x: number;
+  y: number;
+  clusterId: string | null;
+  /** 0..1, already log-compressed (section 13: サイズは対数圧縮). */
+  weight: number;
+  /** True when the reader dragged this tile; a re-layout must not move it. */
+  userOverride: boolean;
+  paper: Paper;
+}
+
+export interface CanvasResponse {
+  tiles: CanvasTile[];
+  /** Which placement algorithm produced these coordinates (section 13). */
+  layoutVersion: string;
+}
+
+export interface MoveTileRequest {
+  x: number;
+  y: number;
+}

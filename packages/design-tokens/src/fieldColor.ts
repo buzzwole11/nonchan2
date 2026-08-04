@@ -23,7 +23,7 @@
  * on the plane — the island it sits in — and its label at close zoom. This module supplies
  * the colour; it does not make colour load-bearing.
  */
-import { parseHex } from './contrast.ts';
+import { contrastRatio, parseHex } from './contrast.ts';
 
 /**
  * One base colour per top-level field.
@@ -139,4 +139,22 @@ export function blendFieldColors(weights: Record<string, number>): string {
   );
 
   return oklabToHex(mixed);
+}
+
+/** Ink and paper for text drawn on a field tile. Section 20 requires the contrast to hold. */
+export const TILE_INK_DARK = '#101828';
+export const TILE_INK_LIGHT = '#ffffff';
+
+/**
+ * A legible text colour for a label drawn on ``background``.
+ *
+ * Picked by measured contrast rather than fixed to white. Field colours span a wide
+ * lightness range on purpose — `stat` is a bright amber — and white on the light end of
+ * that range fails WCAG outright, which would put the one label that names the field out
+ * of reach of the readers most likely to need it.
+ */
+export function readableOn(background: string): string {
+  return contrastRatio(TILE_INK_LIGHT, background) >= contrastRatio(TILE_INK_DARK, background)
+    ? TILE_INK_LIGHT
+    : TILE_INK_DARK;
 }

@@ -12,6 +12,7 @@
 import type {
   ActionResponse,
   AuthTokenResponse,
+  CanvasResponse,
   CreateActionRequest,
   CreateExpressionRequest,
   CreateImpressionsRequest,
@@ -33,6 +34,7 @@ import type {
   ReviewQueueResponse,
   SavePaperRequest,
   SavedListQuery,
+  MoveTileRequest,
   SavedListResponse,
   SavedPaperResponse,
   SearchResponse,
@@ -264,6 +266,17 @@ export class ApiClient {
    */
   searchSaved(query: string, limit = 30): Promise<SearchResponse> {
     return this.request<SearchResponse>('/search', { query: { q: query, limit } });
+  }
+
+  // -- canvas (spec section 13) --------------------------------------------------
+
+  canvas(limit = 500): Promise<CanvasResponse> {
+    return this.request<CanvasResponse>('/canvas', { query: { limit } });
+  }
+
+  /** Record where the reader put a tile. Returns the whole plane, already updated. */
+  moveTile(paperId: string, body: MoveTileRequest): Promise<CanvasResponse> {
+    return this.request<CanvasResponse>(`/canvas/${paperId}`, { method: 'PATCH', body });
   }
 
   savePaper(paperId: string, body: SavePaperRequest = {}): Promise<SavedPaperResponse> {
