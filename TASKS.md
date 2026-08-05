@@ -304,7 +304,10 @@ AI が要る項目は環境制約で未着手です（DECISIONS.md D-024）。
 
 ## Phase 7 — 高度探索
 
-- [ ] Constellation / Landscape / Spectrum
+- [x] **Constellation / Landscape / Spectrum**（`src/canvas/CanvasStyles.tsx`）—
+      **同じ座標を 4 通りに描くだけで、配置は変えない**。Constellation の線は
+      分類器が根拠を持って出した関係だけ（近いから結ぶ、はしない）。
+      Spectrum は空白の年も帯として描く（DECISIONS.md D-055）
 - [x] **論文関係（基礎 / 対立 / 後続 / 類似）と根拠の保持**
       （`services/relations.py`, `GET /papers/{id}/relations`, `src/canvas/RelationList.tsx`）—
       **類似度だけで断定しない**（17 節）。類似度が単独で出せるラベルは「類似」のみ。
@@ -319,7 +322,9 @@ AI が要る項目は環境制約で未着手です（DECISIONS.md D-024）。
       「Figure 1」「Introduction 1〜3段落」は作らない**。各段は実際に持っているもの
       （判定済み Abstract 文・抽出済み数式・メタデータ）を指すか、原論文への
       引き渡しであることを明示する（`held`）（DECISIONS.md D-054）
-- [ ] Timeline 再生
+- [x] **Timeline 再生**（`src/canvas/timeline.ts`）— 月単位で保存履歴を再生し、
+      **分野数**で関心の広がりを出す（論文数は同じ場所を読み続けても増える）。
+      ボタン操作（スライダーはジェスチャー）（DECISIONS.md D-055）
 - [ ] 数式知識グラフ
 - [x] **共有画像の書き出し**（`src/share/shareCard.ts`, `src/share/ShareSheet.tsx`）—
       **私的な項目（自分のメモ・保存理由）は既定で off、それ以外は既定で on**。

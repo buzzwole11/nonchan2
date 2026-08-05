@@ -451,6 +451,8 @@ export interface CanvasTile {
   weight: number;
   /** True when the reader dragged this tile; a re-layout must not move it. */
   userOverride: boolean;
+  /** When the reader saved it. Section 13's timeline slider replays the plane by this. */
+  savedAt: Iso8601;
   paper: Paper;
 }
 

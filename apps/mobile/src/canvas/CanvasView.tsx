@@ -28,6 +28,15 @@ import type { CanvasTile } from '@papermatch/shared-types';
 import { canvasQuery, queryKeys, relationsQuery } from '../api/queries';
 import { useSession } from '../api/session';
 import { CanvasPlane, fieldsOnPlane } from './CanvasPlane';
+import {
+  CANVAS_STYLES,
+  ConstellationView,
+  LandscapeView,
+  SpectrumView,
+  offPlaneRelations,
+  type CanvasStyle,
+} from './CanvasStyles';
+import { fieldBreadth, timelineSteps, visibleAt } from './timeline';
 import { RelationList } from './RelationList';
 import { Chip } from '../components/Chip';
 import { PressableRow } from '../components/PressableRow';
@@ -59,6 +68,11 @@ export function CanvasView({ selectedId, onSelectedChange }: CanvasViewProps) {
 
   const [zoomIndex, setZoomIndex] = useState(0);
   const [fieldFilter, setFieldFilter] = useState<string | null>(null);
+  // Section 13's four styles. All four read the same coordinates; switching never re-places.
+  const [style, setStyle] = useState<CanvasStyle>('mosaic');
+  // The history slider's position, or null for "everything" — the position it opens at, so
+  // the plane is complete until the reader chooses to wind it back.
+  const [replayIndex, setReplayIndex] = useState<number | null>(null);
 
   const locale: 'ja' | 'en' = (user?.settings.locale ?? 'ja').startsWith('en') ? 'en' : 'ja';
   const t = (key: MessageKey, params?: Record<string, string | number>) =>
@@ -66,10 +80,17 @@ export function CanvasView({ selectedId, onSelectedChange }: CanvasViewProps) {
 
   const { data, isPending } = useQuery(canvasQuery(api));
   const allTiles = useMemo(() => data?.tiles ?? [], [data]);
-  const tiles = useMemo(
+  const filtered = useMemo(
     () => (fieldFilter === null ? allTiles : allTiles.filter((t) => t.clusterId === fieldFilter)),
     [allTiles, fieldFilter],
   );
+  // Built from the whole library, not the filtered subset: the months a reader was saving in
+  // do not change because they narrowed to one field, and a slider whose length moved with
+  // an unrelated filter would be unusable.
+  const steps = useMemo(() => timelineSteps(allTiles), [allTiles]);
+  const breadth = useMemo(() => fieldBreadth(allTiles, steps), [allTiles, steps]);
+  const cutoff = replayIndex === null ? null : (steps[replayIndex]?.cutoff ?? null);
+  const tiles = useMemo(() => visibleAt(filtered, cutoff), [filtered, cutoff]);
   const fields = useMemo(() => fieldsOnPlane(allTiles), [allTiles]);
   const selected = tiles.find((tile) => tile.entityId === selectedId) ?? null;
   // Fetched per selection rather than for the whole plane: the server classifies against the
@@ -78,6 +99,9 @@ export function CanvasView({ selectedId, onSelectedChange }: CanvasViewProps) {
   const relations = useQuery(relationsQuery(api, selected?.paper.id ?? null));
 
   const planeHeight = Math.max(280, Math.round(width * 0.95));
+  const offPlane = offPlaneRelations(tiles, relations.data?.relations ?? []);
+  const labelFor = (tile: CanvasTile) =>
+    t('canvas.tile', { title: tile.paper.title, field: tile.clusterId ?? '—' });
   const scale = ZOOM_STEPS[zoomIndex] ?? 1;
 
   function select(tile: CanvasTile): void {
@@ -133,25 +157,177 @@ export function CanvasView({ selectedId, onSelectedChange }: CanvasViewProps) {
         {t('canvas.count', { count: tiles.length, fields: fields.length })}
       </Text>
 
-      <CanvasPlane
-        tiles={tiles}
-        selectedId={selectedId}
-        onSelect={select}
-        locale={locale}
-        scale={scale}
-        width={width}
-        height={planeHeight}
-        labelFor={(tile) =>
-          t('canvas.tile', { title: tile.paper.title, field: tile.clusterId ?? '—' })
-        }
-        hint={t('canvas.tileHint')}
-        islandLabel={(island) => t('canvas.island', { field: island.fieldId, count: island.count })}
-        onIslandPress={(fieldId) => {
-          // Section 13's クラスタズーム: tapping an island narrows to it and steps in.
-          setFieldFilter(fieldId);
-          setZoomIndex((index) => Math.max(index, 1));
+      {/* Section 13's four Canvas styles. Four ways of drawing one plane — the coordinates
+          are the server's and none of these touch them, so a paper found in Mosaic is in
+          the same relative place in Landscape. */}
+      <View
+        style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: theme.spacing.sm,
+          paddingHorizontal: theme.spacing.screenHorizontal,
         }}
-      />
+      >
+        {CANVAS_STYLES.map((candidate) => (
+          <Chip
+            key={candidate}
+            label={t(`canvasStyle.${candidate}` as MessageKey)}
+            selected={candidate === style}
+            tone="accent"
+            onPress={() => setStyle(candidate)}
+            accessibilityLabel={`${t('canvas.style')}: ${t(`canvasStyle.${candidate}` as MessageKey)}`}
+          />
+        ))}
+      </View>
+
+      {style === 'mosaic' ? (
+        <CanvasPlane
+          tiles={tiles}
+          selectedId={selectedId}
+          onSelect={select}
+          locale={locale}
+          scale={scale}
+          width={width}
+          height={planeHeight}
+          labelFor={labelFor}
+          hint={t('canvas.tileHint')}
+          islandLabel={(island) =>
+            t('canvas.island', { field: island.fieldId, count: island.count })
+          }
+          onIslandPress={(fieldId) => {
+            // Section 13's クラスタズーム: tapping an island narrows to it and steps in.
+            setFieldFilter(fieldId);
+            setZoomIndex((index) => Math.max(index, 1));
+          }}
+        />
+      ) : tiles.length === 0 ? (
+        <View style={{ width, height: planeHeight, ...styles.centre }}>
+          <Text variant="caption" tone="secondary">
+            {t('canvas.noneInRange')}
+          </Text>
+        </View>
+      ) : style === 'constellation' ? (
+        <ConstellationView
+          tiles={tiles}
+          selectedId={selectedId}
+          onSelect={select}
+          width={width}
+          height={planeHeight}
+          labelFor={labelFor}
+          relations={relations.data?.relations ?? []}
+        />
+      ) : style === 'landscape' ? (
+        <LandscapeView
+          tiles={tiles}
+          selectedId={selectedId}
+          onSelect={select}
+          width={width}
+          height={planeHeight}
+          labelFor={labelFor}
+        />
+      ) : (
+        <SpectrumView
+          tiles={tiles}
+          selectedId={selectedId}
+          onSelect={select}
+          width={width}
+          height={planeHeight}
+          labelFor={labelFor}
+        />
+      )}
+
+      {/* Constellation draws an edge only where the classifier found one (section 17), so
+          with nothing selected there are no lines to draw. Said, rather than left as an
+          empty sky the reader reads as a broken feature. */}
+      {style === 'constellation' && (
+        <Text
+          variant="caption"
+          tone="secondary"
+          style={{ paddingHorizontal: theme.spacing.screenHorizontal }}
+          accessibilityLiveRegion="polite"
+        >
+          {selected === null
+            ? t('canvas.constellationHint')
+            : offPlane > 0
+              ? // A relation to a paper the reader has not saved has no star to reach. Said,
+                // rather than leaving a selected star with no lines looking broken.
+                t('canvas.constellationOffPlane', { count: offPlane })
+              : t('canvas.constellationLines', {
+                  count: (relations.data?.relations.length ?? 0) - offPlane,
+                })}
+        </Text>
+      )}
+
+      {/* Section 13: 年月スライダーで保存履歴を再生. Buttons rather than a drag: a slider is a
+          gesture, and section 20 wants every gesture to have an equivalent. */}
+      {steps.length > 1 && (
+        <View
+          style={{
+            paddingHorizontal: theme.spacing.screenHorizontal,
+            gap: theme.spacing.xs,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: theme.spacing.sm,
+            }}
+          >
+            <Text variant="caption" tone="secondary">
+              {t('canvas.replay')}
+            </Text>
+            <PressableRow
+              onPress={() =>
+                setReplayIndex((index) => Math.max(0, (index ?? steps.length - 1) - 1))
+              }
+              accessibilityLabel={t('canvas.replayBack')}
+            >
+              <Text variant="label" tone="accent">
+                −
+              </Text>
+            </PressableRow>
+            <PressableRow
+              onPress={() =>
+                setReplayIndex((index) =>
+                  index === null || index >= steps.length - 1 ? null : index + 1,
+                )
+              }
+              accessibilityLabel={t('canvas.replayForward')}
+            >
+              <Text variant="label" tone="accent">
+                ＋
+              </Text>
+            </PressableRow>
+            <Text variant="caption" tone="secondary" accessibilityLiveRegion="polite">
+              {replayIndex === null
+                ? t('canvas.replayAll')
+                : t('canvas.replayAt', {
+                    year: steps[replayIndex]?.year ?? 0,
+                    month: steps[replayIndex]?.month ?? 0,
+                  })}
+            </Text>
+            {replayIndex !== null && (
+              <PressableRow
+                onPress={() => setReplayIndex(null)}
+                accessibilityLabel={t('canvas.replayReset')}
+              >
+                <Text variant="caption" tone="secondary">
+                  {t('canvas.replayReset')}
+                </Text>
+              </PressableRow>
+            )}
+          </View>
+          {/* Section 13 asks for 関心領域の拡大を客観的に表示 — a count of fields, not an
+              impression. The paper count grows even when someone reads one corner forever. */}
+          <Text variant="caption" tone="secondary">
+            {t('canvas.breadth', {
+              count: replayIndex === null ? fields.length : (breadth[replayIndex] ?? 0),
+            })}
+          </Text>
+        </View>
+      )}
 
       {/* Zoom as buttons: section 20 wants a non-gesture equivalent for every gesture, and
           here the buttons are the primary control rather than the fallback. */}

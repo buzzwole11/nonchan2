@@ -57,6 +57,7 @@ def read_canvas(
                 cluster_id=tile.cluster_id,
                 weight=tile.weight,
                 user_override=tile.user_override,
+                saved_at=tile.saved_at,
                 paper=serialize_paper(papers[tile.entity_id]),
             )
             for tile in tiles

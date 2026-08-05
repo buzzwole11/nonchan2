@@ -52,6 +52,7 @@ import math
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -123,6 +124,10 @@ class PlacedTile:
     #: 0..1, already log-compressed. The client turns this into a tile area.
     weight: float
     user_override: bool
+    #: When the reader saved it. Section 13's 年月スライダーで保存履歴を再生 needs this on the
+    #: tile: the plane is what gets replayed, and a second request per tile to find out when
+    #: each one arrived would make the slider unusable.
+    saved_at: datetime
 
 
 def _hash_unit(text: str, salt: str) -> float:
@@ -339,6 +344,7 @@ def layout_for(session: Session, user: User, *, limit: int = 500) -> list[Placed
                 cluster_id=position.cluster_id,
                 weight=personal_weight(saved),
                 user_override=position.user_override,
+                saved_at=saved.saved_at,
             )
         )
 

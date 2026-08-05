@@ -674,6 +674,8 @@ class CanvasTileOut(CamelModel):
     weight: float
     #: True when the reader dragged this tile; a re-layout must not move it.
     user_override: bool
+    #: When the reader saved it, for section 13's 年月スライダーで保存履歴を再生.
+    saved_at: datetime
     paper: PaperOut
 
 
