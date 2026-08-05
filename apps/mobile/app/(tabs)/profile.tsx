@@ -13,9 +13,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ENGLISH_LEVELS,
   EXPLORATION_LEVELS,
+  NOTIFICATION_PRESETS,
   MATH_LEVELS,
   type EnglishLevel,
   type ExplorationLevel,
+  type NotificationPreset,
   type MathLevel,
 } from '@papermatch/shared-types';
 
@@ -136,6 +138,31 @@ export default function ProfileScreen() {
             />
           ))}
         </View>
+      </Section>
+
+      {/* Section 26's プリセット. The saved default is `quiet` rather than the most
+          talkative option: a default that notifies is a decision made on the reader's
+          behalf about their attention, and 「通知なし」 is one tap away. */}
+      <Section title={t('profile.notifications')}>
+        <Text variant="caption" tone="secondary">
+          {t('notify.explainer')}
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+          {NOTIFICATION_PRESETS.map((preset) => (
+            <Chip
+              key={preset}
+              label={t(`notify.${preset}` as MessageKey)}
+              selected={(user?.settings.notificationPreset ?? 'quiet') === preset}
+              tone="accent"
+              onPress={() => void patch({ notificationPreset: preset as NotificationPreset })}
+              accessibilityLabel={`${t('profile.notifications')}: ${t(`notify.${preset}` as MessageKey)}`}
+            />
+          ))}
+        </View>
+        {/* Said plainly rather than left for someone to discover by waiting for one. */}
+        <Text variant="caption" tone="secondary">
+          {t('notify.notYetDelivered')}
+        </Text>
       </Section>
 
       <Section title={t('profile.display')}>

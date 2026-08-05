@@ -15,6 +15,7 @@
 | [x] | CI | `.github/workflows/ci.yml` — API（lint / mypy / pytest / migration 適用）、TypeScript（typecheck / test）、fixture 再現性 |
 | [x] | デザイントークン | `packages/design-tokens`。コントラスト・Reduce Motion・Dynamic Type をテストで検証 |
 | [x] | 認証の最小実装 | `POST /auth/guest`、`GET /me`、`PATCH /me/settings`、`PUT /me/interests` |
+| [x] | ログインと通知設定 | `POST /auth/login`、`POST /auth/register`、通知プリセット（DECISIONS.md D-058） |
 | [x] | DB migrations | Alembic `0001_initial`（26 テーブル）。models との乖離をテストで検出 |
 | [x] | Provider interfaces | 6 種の Protocol + mock 実装 2 種 + registry |
 | [x] | サンプルデータ | 合成 60 件 + 重複変種 3 件。決定論的ジェネレータ |
@@ -319,6 +320,9 @@ AI が要る項目は環境制約で未着手です（DECISIONS.md D-024）。
       基礎 / 後続は引用の向きが要り、対立は本文の言及文が要る。方向は引用から読み、
       公開日は裏付けにしか使わない。根拠（引用の向き・公開順・言及文・モデル）を
       保存し、UI にも表示する（DECISIONS.md D-053）
+- [x] **Library の関心度ソート**（`GET /saved?sort=interest`）— Canvas がタイルの大きさに
+      使う `personal_weight` と同じ入力で並べる。平面で大きく見える論文が一覧で上に来る
+      （14 節の「位置関係を失わない」は並びについても同じ）
 - [ ] 本文中の言及の抽出をパイプラインに接続（分類器は言及に対応済みだが、
       全文を保存する仕組みがまだ無いため入力が空のまま）
 - [x] **目的別読書ルート**（`services/reading_path.py`, `GET /papers/{id}/reading-path`,

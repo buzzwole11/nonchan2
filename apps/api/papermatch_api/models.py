@@ -81,6 +81,9 @@ class User(Base, TimestampMixin):
     id: Mapped[uuid.UUID] = mapped_column(UuidType, primary_key=True, default=_uuid)
     is_guest: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     email: Mapped[str | None] = mapped_column(String(320), unique=True, nullable=True)
+    #: Null for every guest. Section 4 puts the first card before any sign-up, so an account
+    #: without a password is the normal state rather than an incomplete one.
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     display_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     onboarding_completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
@@ -111,6 +114,7 @@ class UserSettings(Base, TimestampMixin):
         CheckConstraint("color_scheme IN ('system', 'light', 'dark')", name="ck_color_scheme"),
         CheckConstraint("offline_prefetch_count BETWEEN 0 AND 200", name="ck_offline_prefetch"),
         CheckConstraint("reshow_after_days BETWEEN 0 AND 3650", name="ck_reshow_after_days"),
+        vocab_check("notification_preset", "notificationPreset"),
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
@@ -136,6 +140,9 @@ class UserSettings(Base, TimestampMixin):
     high_contrast: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     offline_prefetch_count: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
     reshow_after_days: Mapped[int] = mapped_column(Integer, nullable=False, default=90)
+    #: Section 26's プリセット. Defaults to `quiet` rather than the most talkative option: a
+    #: default that notifies is a decision made on the reader's behalf about their attention.
+    notification_preset: Mapped[str] = mapped_column(String(32), nullable=False, default="quiet")
     #: Spec section 25: opt-in only, and off unless the user says otherwise.
     allow_selections_for_model_improvement: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False

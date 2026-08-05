@@ -188,6 +188,24 @@ export const RELATION_TYPES = ['related', 'contrasting', 'foundational', 'follow
 
 export const CANVAS_STYLES = ['mosaic', 'constellation', 'landscape', 'spectrum'] as const;
 
+/** Section 26: 通知なし / 静か / 1日1回 / 平日のみ / 重要時のみ. */
+export const NOTIFICATION_PRESETS = [
+  'none',
+  'quiet',
+  'daily',
+  'weekdays',
+  'important_only',
+] as const;
+
+/** Section 26: what a notification can be about. */
+export const NOTIFICATION_CATEGORIES = [
+  'daily_abstract',
+  'important_arrival',
+  'saved_paper_update',
+  'review_due',
+  'new_math_card',
+] as const;
+
 export const METRIC_SIGNATURES = ['as_published', 'mostly_minus', 'mostly_plus'] as const;
 
 export const UNIT_SYSTEMS = [
@@ -222,6 +240,8 @@ export type TranslationStage = (typeof TRANSLATION_STAGES)[number];
 export type ProvenanceKind = (typeof PROVENANCE_KINDS)[number];
 export type VerificationStatus = (typeof VERIFICATION_STATUSES)[number];
 export type MathCardType = (typeof MATH_CARD_TYPES)[number];
+export type NotificationPreset = (typeof NOTIFICATION_PRESETS)[number];
+export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
 export type RelationType = (typeof RELATION_TYPES)[number];
 export type CanvasStyle = (typeof CANVAS_STYLES)[number];
 export type MetricSignature = (typeof METRIC_SIGNATURES)[number];
@@ -255,6 +275,8 @@ export const VOCABULARY_TUPLES: Record<string, readonly string[]> = {
   mathCardType: MATH_CARD_TYPES,
   relationType: RELATION_TYPES,
   canvasStyle: CANVAS_STYLES,
+  notificationPreset: NOTIFICATION_PRESETS,
+  notificationCategory: NOTIFICATION_CATEGORIES,
   metricSignature: METRIC_SIGNATURES,
   unitSystem: UNIT_SYSTEMS,
 };

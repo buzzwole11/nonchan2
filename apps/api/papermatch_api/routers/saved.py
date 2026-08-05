@@ -11,7 +11,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from papermatch_api.db import get_db
@@ -51,6 +51,7 @@ def abstract_segments_for(
 SORT_KEYS = (
     "recently_saved",
     "recently_visited",
+    "interest",
     "year",
     "reading_time",
     "english_level",
@@ -76,6 +77,20 @@ def _order_by(sort: str):  # type: ignore[no-untyped-def]
             # Never-visited rows sort last rather than first, which is what "recently
             # visited" means to a reader.
             return (SavedPaper.last_visited_at.desc().nullslast(), SavedPaper.saved_at.desc())
+        case "interest":
+            # Section 14's 関心度, ordered by the same inputs the Canvas sizes a tile by
+            # (`services/canvas.personal_weight`): what the reader marked as important, and
+            # whether they came back to it. The weight there is log-compressed, which is
+            # monotone, so the two orderings agree — a paper that looks big on the plane
+            # sorts high here, and a reader switching views does not see them disagree.
+            return (
+                (
+                    SavedPaper.priority
+                    + case((SavedPaper.last_visited_at.is_not(None), 1), else_=0)
+                ).desc(),
+                SavedPaper.last_visited_at.desc().nullslast(),
+                SavedPaper.saved_at.desc(),
+            )
         case "year":
             return (Paper.year.desc(), SavedPaper.saved_at.desc())
         case "reading_time":

@@ -4,16 +4,19 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from papermatch_api.db import get_db
 from papermatch_api.models import Field, Interest, User, UserSettings
+from papermatch_api.passwords import hash_password, verify_password
 from papermatch_api.schemas import (
     AuthTokenResponse,
     GuestAuthRequest,
     InterestOut,
+    LoginRequest,
+    RegisterRequest,
     UpdateInterestsRequest,
     UserOut,
     UserSettingsOut,
@@ -56,6 +59,77 @@ def create_guest(
 
     token, expires_in = create_access_token(user.id)
     return AuthTokenResponse(access_token=token, expires_in=expires_in, user=_to_user_out(user))
+
+
+@router.post(
+    "/auth/register", response_model=AuthTokenResponse, status_code=status.HTTP_201_CREATED
+)
+def register(
+    payload: RegisterRequest,
+    user: CurrentUser,
+    db: Annotated[Session, Depends(get_db)],
+) -> AuthTokenResponse:
+    """Attach an email and password to the account the reader is already using.
+
+    Deliberately an upgrade of the current guest rather than a new account. Section 4 puts
+    the first Abstract card before any sign-up, so by the time someone registers they have a
+    library — and creating a second account here would strand it while looking like success.
+    """
+    if not user.is_guest:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "already_registered", "message": "this account already has a login"},
+        )
+
+    email = payload.email.strip().lower()
+    taken = db.execute(select(User).where(User.email == email)).scalar_one_or_none()
+    if taken is not None:
+        # The same wording a wrong password gets, for the same reason: a distinct message
+        # here turns the form into a way of asking whether someone has an account.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "email_unavailable", "message": "that email cannot be used"},
+        )
+
+    user.email = email
+    user.password_hash = hash_password(payload.password)
+    user.is_guest = False
+    if payload.display_name is not None:
+        user.display_name = payload.display_name.strip() or None
+    db.flush()
+    db.refresh(user)
+
+    token, expires_in = create_access_token(user.id)
+    return AuthTokenResponse(access_token=token, expires_in=expires_in, user=_to_user_out(user))
+
+
+@router.post("/auth/login", response_model=AuthTokenResponse)
+def login(
+    payload: LoginRequest,
+    db: Annotated[Session, Depends(get_db)],
+) -> AuthTokenResponse:
+    """Sign in to an existing account (spec section 24).
+
+    **One answer for every failure.** A wrong password, an unknown email and an account with
+    no password set all return the same 401. Anything else makes this endpoint a way to find
+    out who has an account here, which is a fact about someone's reading that they did not
+    publish.
+    """
+    email = payload.email.strip().lower()
+    found = db.execute(select(User).where(User.email == email)).scalar_one_or_none()
+
+    # `verify_password` is run even when there is no such user, so a missing account and a
+    # wrong password take a similar amount of time.
+    stored = found.password_hash if found is not None else None
+    if not verify_password(payload.password, stored) or found is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "invalid_credentials", "message": "email or password is wrong"},
+        )
+
+    db.refresh(found)
+    token, expires_in = create_access_token(found.id)
+    return AuthTokenResponse(access_token=token, expires_in=expires_in, user=_to_user_out(found))
 
 
 @router.get("/me", response_model=UserOut)

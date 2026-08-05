@@ -179,5 +179,19 @@
   },
   "unitSystem": {
     "values": ["si", "gaussian", "heaviside_lorentz", "natural", "geometric"]
+  },
+  "notificationPreset": {
+    "$note": "Section 26: 通知なし / 静か / 1日1回 / 平日のみ / 重要時のみ.",
+    "values": ["none", "quiet", "daily", "weekdays", "important_only"]
+  },
+  "notificationCategory": {
+    "$note": "Section 26: what a notification can be about.",
+    "values": [
+      "daily_abstract",
+      "important_arrival",
+      "saved_paper_update",
+      "review_due",
+      "new_math_card"
+    ]
   }
 }

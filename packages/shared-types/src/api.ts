@@ -165,6 +165,12 @@ export interface SavedListResponse {
 export const SAVED_SORT_KEYS = [
   'recently_saved',
   'recently_visited',
+  /**
+   * Section 14's 関心度. The same notion of interest the Canvas sizes a tile by
+   * (`services/canvas.personal_weight`) — what the reader marked as important and whether
+   * they came back to it — so a paper that looks big on the plane sorts high in the list.
+   */
+  'interest',
   'year',
   'reading_time',
   'english_level',

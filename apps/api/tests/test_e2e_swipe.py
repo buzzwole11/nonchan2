@@ -449,3 +449,39 @@ def test_undo_is_not_accepted_as_an_ordinary_action(client: TestClient, seeded_d
     response = client.post("/actions", headers=headers, json={"type": "undo"})
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "use_undo_endpoint"
+
+
+def test_the_interest_sort_agrees_with_how_the_canvas_sizes_a_tile(
+    client: TestClient, seeded_db: Session
+) -> None:
+    """Section 14's 関心度.
+
+    The Canvas sizes a tile by `personal_weight`; this ordering uses the same inputs. A
+    reader switching between the two views must not see them disagree about which paper
+    matters most — that is exactly the loss of place section 14 is about.
+    """
+    headers = _auth(client)
+    papers = client.get("/papers?limit=3", headers=headers).json()["papers"]
+    assert len(papers) >= 2
+
+    for paper in papers[:2]:
+        client.post(f"/saved/{paper['id']}", json={"reasons": ["interesting"]}, headers=headers)
+    # The second one is marked important; nothing else differs.
+    client.patch(f"/saved/{papers[1]['id']}", json={"priority": 3}, headers=headers)
+
+    rows = client.get("/saved?sort=interest", headers=headers).json()["saved"]
+
+    assert rows[0]["paper"]["id"] == papers[1]["id"]
+
+
+def test_an_unknown_sort_key_is_refused_rather_than_silently_defaulted(
+    client: TestClient, seeded_db: Session
+) -> None:
+    headers = _auth(client)
+
+    response = client.get("/saved?sort=vibes", headers=headers)
+
+    assert response.status_code == 422
+    # The error envelope is normalised by the app's exception handler (see `schemas
+    # .error_response`); what matters is that the code names the problem.
+    assert "invalid_sort" in response.text

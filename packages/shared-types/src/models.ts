@@ -18,6 +18,7 @@ import type {
   MathCardType,
   MathLevel,
   MetricSignature,
+  NotificationPreset,
   OpenAccessStatus,
   PaperType,
   ProvenanceKind,
@@ -142,6 +143,8 @@ export interface UserSettings {
   reshowAfterDays: number;
   /** Section 25: opt-in, off by default. */
   allowSelectionsForModelImprovement: boolean;
+  /** Section 26's プリセット. Defaults to `quiet`, not to the most talkative option. */
+  notificationPreset: NotificationPreset;
 }
 
 export interface User {

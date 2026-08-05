@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from pydantic.alias_generators import to_camel
 
 from papermatch_api import vocab
+from papermatch_api.passwords import MIN_PASSWORD_LENGTH
 
 
 class CamelModel(BaseModel):
@@ -89,6 +90,8 @@ class UserSettingsOut(CamelModel):
     offline_prefetch_count: int
     reshow_after_days: int
     allow_selections_for_model_improvement: bool
+    #: Section 26's プリセット.
+    notification_preset: str
 
 
 class UserSettingsPatch(CamelModel):
@@ -111,12 +114,14 @@ class UserSettingsPatch(CamelModel):
     offline_prefetch_count: int | None = Field(default=None, ge=0, le=200)
     reshow_after_days: int | None = Field(default=None, ge=0, le=3650)
     allow_selections_for_model_improvement: bool | None = None
+    notification_preset: str | None = None
 
     _v_english = field_validator("english_level")(_in_vocab("englishLevel"))
     _v_math = field_validator("math_level")(_in_vocab("mathLevel"))
     _v_exploration = field_validator("exploration")(_in_vocab("explorationLevel"))
     _v_style = field_validator("translation_style")(_in_vocab("translationStyle"))
     _v_stage = field_validator("initial_translation_stage")(_in_vocab("translationStage"))
+    _v_notification = field_validator("notification_preset")(_in_vocab("notificationPreset"))
     _v_metric = field_validator("metric_signature")(_in_vocab("metricSignature"))
     _v_units = field_validator("unit_system")(_in_vocab("unitSystem"))
     _v_canvas = field_validator("canvas_style")(_in_vocab("canvasStyle"))
@@ -772,6 +777,28 @@ class EquationGraphResponse(CamelModel):
     edges: list[EquationEdgeOut]
     #: Equations with no edge, named so the client can say why they stand alone.
     isolated: list[uuid.UUID]
+
+
+class RegisterRequest(CamelModel):
+    """Attach a login to the guest account already in use (spec section 24)."""
+
+    email: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=200)
+    display_name: str | None = Field(default=None, max_length=120)
+
+    @field_validator("email")
+    @classmethod
+    def _looks_like_an_email(cls, value: str) -> str:
+        # Not a full grammar — those reject valid addresses. Just enough to catch a
+        # transposed field, which is the mistake that actually happens.
+        if "@" not in value.strip(" "):
+            raise ValueError("email must contain @")
+        return value
+
+
+class LoginRequest(CamelModel):
+    email: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=1, max_length=200)
 
 
 class MoveTileRequest(CamelModel):
