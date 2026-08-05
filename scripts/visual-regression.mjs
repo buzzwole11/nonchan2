@@ -116,11 +116,80 @@ function url(testCase) {
 }
 
 /**
- * Bring every formula frame on screen once, so Chromium paints it.
+ * Wait until every formula frame has reported its height back.
  *
- * By element rather than by `window.scrollTo`: the page's scroll lives on an inner
- * container, so scrolling the window moved nothing and the formulas stayed unpainted —
- * which looked like a pass, because a blank region diffs cleanly against a blank baseline.
+ * The frames are blob-URL iframes that measure themselves and `postMessage` the result; the
+ * React side then gives the iframe that height. So a frame still at zero height has not
+ * finished rendering, and anything captured now shows a **blank** region where a formula
+ * belongs. Blank is the one wrong result that looks like a pass, because it diffs cleanly
+ * against a baseline that was itself captured blank — which is exactly what had happened to
+ * the `light-wide` baseline.
+ */
+async function waitForFrames(page, timeoutMs = 30_000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const pending = await page.evaluate(
+      () =>
+        [...document.querySelectorAll('iframe')].filter((frame) => frame.clientHeight === 0).length,
+    );
+    if (pending === 0) return true;
+    if (Date.now() >= deadline) {
+      console.log(`  note: ${pending} formula frame(s) never reported a height`);
+      return false;
+    }
+    await page.waitForTimeout(250);
+  }
+}
+
+/**
+ * Grow the viewport until the whole gallery fits inside it.
+ *
+ * `fullPage: true` was the wrong tool here. It stitches by resizing and re-rendering, and a
+ * formula frame that is offscreen at capture time is simply never painted — the region comes
+ * out blank, and blank is the one failure that reads as a pass, because it matches a
+ * baseline that was itself captured blank. Waiting for the frames to report their heights
+ * does not fix it either: the height arrives from `postMessage` well before Chromium decides
+ * to paint an offscreen frame. Making everything on-screen removes the condition instead of
+ * timing around it.
+ */
+async function fitViewportToPage(page, width) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const needed = await page.evaluate(() =>
+      Math.max(document.documentElement.scrollHeight, document.body.scrollHeight),
+    );
+    const current = page.viewportSize();
+    if (current !== null && current.height >= needed) return;
+    await page.setViewportSize({ width, height: needed });
+    // Reflow can lengthen the page again (a formula that now wraps differently), so this
+    // measures and grows rather than assuming one pass is enough.
+    await page.waitForTimeout(1_500);
+  }
+}
+
+/**
+ * Screenshot, and keep screenshotting until two in a row are identical.
+ *
+ * A single capture can land mid-paint, and the result is a baseline that records a frame
+ * halfway through rendering. Requiring the page to hold still first is what makes a run mean
+ * the same thing twice.
+ */
+async function stableScreenshot(page, attempts = 8) {
+  let previous = await page.screenshot();
+  for (let index = 1; index < attempts; index += 1) {
+    await page.waitForTimeout(500);
+    const current = await page.screenshot();
+    if (current.equals(previous)) return current;
+    previous = current;
+  }
+  console.log('  note: the page never held still; capturing the last frame anyway');
+  return previous;
+}
+
+/**
+ * Touch every formula frame once more, by element rather than by `window.scrollTo` — the
+ * page's scroll lives on an inner container, so scrolling the window moves nothing. Belt and
+ * braces now that the viewport already contains the whole page: cheap, and it costs nothing
+ * if every frame is already painted.
  */
 async function paintFrames(page) {
   const frames = page.locator('iframe');
@@ -194,18 +263,19 @@ async function main() {
     try {
       await page.goto(url(testCase), { waitUntil: 'load', timeout: 180_000 });
       // The formulas render in iframes that report their height back; the layout is not
-      // final until that has happened.
-      await page.waitForTimeout(6_000);
+      // final until that has happened. Waited for rather than timed out on — a fixed delay
+      // passed on some runs and captured a blank formula on others, and the run that
+      // captured blank was the one that wrote the baseline.
+      await waitForFrames(page);
 
-      // Chromium never paints an iframe that has not been scrolled into view, and a
-      // full-page screenshot does not scroll. Without this the formula sections came out
-      // blank — and blank is the one result that looks like a pass, because there is
-      // nothing to diff against a blank baseline.
+      // Everything on-screen at once, so no frame is ever offscreen at capture time. The
+      // sections below the fold are exactly the ones nobody checks by hand, and they are
+      // also the ones that came out blank.
+      await fitViewportToPage(page, testCase.width);
       await paintFrames(page);
+      await waitForFrames(page);
 
-      // The whole gallery, not just the viewport: the sections below the fold are exactly
-      // the ones nobody checks by hand.
-      const current = await page.screenshot({ fullPage: true });
+      const current = await stableScreenshot(page);
       const baselinePath = join(BASELINE_DIR, `${testCase.name}.png`);
 
       if (UPDATE || !existsSync(baselinePath)) {

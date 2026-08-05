@@ -40,6 +40,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { blendFieldColors, fieldColor, readableOn } from '@papermatch/design-tokens';
 import type { CanvasTile } from '@papermatch/shared-types';
 
+import { useMorphTarget } from './MorphTargets';
 import { Text } from '../components/Text';
 import { useTheme } from '../theme/ThemeProvider';
 
@@ -109,6 +110,30 @@ export function islandsOf(tiles: CanvasTile[]): Island[] {
       color: fieldColor(fieldId),
     }))
     .sort((a, b) => b.count - a.count || a.fieldId.localeCompare(b.fieldId));
+}
+
+/**
+ * An island's diameter.
+ *
+ * Shared by the circle that is drawn and by the morph endpoint the plane registers for it,
+ * so the shape that lands cannot be a different size from the one underneath it.
+ */
+function islandDiameter(count: number, maxCount: number): number {
+  return 34 + 26 * Math.sqrt(count / maxCount);
+}
+
+/** A tile's side, in points. Tied to the cell so tiles abut instead of overlapping. */
+function tileSide(unit: number, weight: number, isSelected: boolean): number {
+  const fraction = TILE_MIN + (TILE_MAX - TILE_MIN) * Math.max(0, Math.min(1, weight));
+  return unit * fraction * (isSelected ? SELECTED_SCALE : 1);
+}
+
+/** A tile's colour: the paper's field mix, or its cluster when the paper carries no weights. */
+function tileColor(tile: CanvasTile): string {
+  const weights = tile.paper.fieldWeights ?? {};
+  return blendFieldColors(
+    Object.keys(weights).length > 0 ? weights : { [tile.clusterId ?? '']: 1 },
+  );
 }
 
 export interface CanvasPlaneProps {
@@ -207,17 +232,44 @@ export function CanvasPlane({
   // Section 13's answer at that scale is 分野島と件数, so that is what gets drawn.
   const asIslands = unit * TILE_MAX < MIN_TAP_SIZE;
   const islands = useMemo(() => (asIslands ? islandsOf(tiles) : []), [asIslands, tiles]);
+  const maxCount = islands.reduce((most, island) => Math.max(most, island.count), 1);
+
+  // Where the selected paper is on the plane, and what shape it is drawn as, so the morph
+  // between the Library row and here lands on the real thing rather than an approximation
+  // of it (section 14).
+  //
+  // At island scale the paper has no tile of its own — but it is not nowhere: it is in its
+  // field's island, and that is an honest destination. Refusing to morph here would mean the
+  // ordinary case, switching to Canvas at the zoom it opens at, never got the continuous
+  // transformation at all.
+  const selectedField = selected?.clusterId ?? null;
+  const selectedIsland = islands.find((island) => island.fieldId === selectedField) ?? null;
+  const morphShape =
+    asIslands && selectedIsland !== null
+      ? {
+          radius: islandDiameter(selectedIsland.count, maxCount) / 2,
+          color: selectedIsland.color,
+        }
+      : selected !== null
+        ? {
+            radius: Math.min(tileSide(unit, selected.weight, true) / 4, theme.radius.tile),
+            color: tileColor(selected),
+          }
+        : { radius: 0, color: theme.color.background };
+  // Only the selected paper is a morph endpoint (section 14 morphs 選択中のタイル), so this is
+  // one hook at the top rather than one per tile.
+  const morphRef = useMorphTarget(selectedId, morphShape);
 
   if (asIslands) {
-    const maxCount = islands.reduce((most, island) => Math.max(most, island.count), 1);
     // Islands are drawn to fit, so this view never scrolls.
     return (
       <View style={{ width, height, overflow: 'hidden', backgroundColor: theme.color.background }}>
         {islands.map((island) => {
-          const size = 34 + 26 * Math.sqrt(island.count / maxCount);
+          const size = islandDiameter(island.count, maxCount);
           return (
             <Pressable
               key={island.fieldId}
+              ref={island.fieldId === selectedField ? morphRef : undefined}
               onPress={() => onIslandPress?.(island.fieldId)}
               accessibilityRole="button"
               accessibilityLabel={islandLabel(island)}
@@ -273,21 +325,16 @@ export function CanvasPlane({
             const nudge = theme.reduceMotion ? { dx: 0, dy: 0 } : neighbourOffset(tile, selected);
             // A fraction of one cell, from the reader's own attention (section 13), then the
             // selection lift. Tied to the cell so tiles abut instead of overlapping.
-            const fraction =
-              TILE_MIN + (TILE_MAX - TILE_MIN) * Math.max(0, Math.min(1, tile.weight));
-            const size = unit * fraction * (isSelected ? SELECTED_SCALE : 1);
+            const size = tileSide(unit, tile.weight, isSelected);
             const left = originX + (tile.x + nudge.dx - box.minX) * unit - size / 2;
             const top = originY + (tile.y + nudge.dy - box.minY) * unit - size / 2;
 
-            const colour = blendFieldColors(
-              Object.keys(tile.paper.fieldWeights ?? {}).length > 0
-                ? tile.paper.fieldWeights
-                : { [tile.clusterId ?? '']: 1 },
-            );
+            const colour = tileColor(tile);
 
             return (
               <Pressable
                 key={tile.entityId}
+                ref={isSelected ? morphRef : undefined}
                 onPress={() => onSelect(tile)}
                 accessibilityRole="button"
                 accessibilityLabel={labelFor(tile)}

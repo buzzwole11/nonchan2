@@ -22,7 +22,15 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
-import { ActivityIndicator, FlatList, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Dimensions,
+  FlatList,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -36,6 +44,13 @@ import {
 import { queryKeys, savedQuery, searchQuery } from '../../src/api/queries';
 import { useSession } from '../../src/api/session';
 import { CanvasView } from '../../src/canvas/CanvasView';
+import { MorphLayer } from '../../src/canvas/MorphLayer';
+import {
+  MorphTargetsProvider,
+  useMorphTarget,
+  useMorphTargets,
+} from '../../src/canvas/MorphTargets';
+import { type MorphEnds, canMorph } from '../../src/canvas/morph';
 import { Chip } from '../../src/components/Chip';
 import { PressableRow } from '../../src/components/PressableRow';
 import { Text } from '../../src/components/Text';
@@ -51,7 +66,19 @@ interface Row {
   matchedField?: SearchMatchField;
 }
 
+/**
+ * The provider has to sit above the screen because the screen is what asks for both
+ * measurements — the tile's before the switch and the row's after it.
+ */
 export default function SavedScreen() {
+  return (
+    <MorphTargetsProvider>
+      <SavedLibrary />
+    </MorphTargetsProvider>
+  );
+}
+
+function SavedLibrary() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { api, user, status } = useSession();
@@ -63,7 +90,14 @@ export default function SavedScreen() {
   // saved entry together, and looking them up again could disagree with the row that was
   // tapped after a refetch.
   const [sharing, setSharing] = useState<Row | null>(null);
+  // The shape in flight between the two views, or null when nothing is travelling.
+  const [morph, setMorph] = useState<MorphEnds | null>(null);
   const queryClient = useQueryClient();
+  const targets = useMorphTargets();
+  const rowRef = useMorphTarget(selectedPaperId, {
+    radius: theme.radius.tile,
+    color: theme.color.card,
+  });
 
   const locale: 'ja' | 'en' = (user?.settings.locale ?? 'ja').startsWith('en') ? 'en' : 'ja';
   const t = (key: MessageKey, params?: Record<string, string | number>) =>
@@ -92,6 +126,45 @@ export default function SavedScreen() {
     : searching
       ? (search.data?.hits ?? [])
       : (data?.rows.saved ?? []);
+
+  /**
+   * Switch views, morphing the selected paper across (spec section 14).
+   *
+   * The switch itself is never waited on: `setView` happens before the second measurement,
+   * so a paper that turns out to have no rectangle on the other side costs the animation
+   * and not the change of view. Reduce Motion takes the plain swap (section 20), which is
+   * one of the two answers that section allows.
+   */
+  async function switchTo(next: 'library' | 'canvas'): Promise<void> {
+    if (next === view) return;
+    const id = selectedPaperId;
+
+    if (id === null || targets === null || theme.reduceMotion) {
+      setView(next);
+      return;
+    }
+
+    const from = await targets.measure(id);
+    // Between the two measurements, so the destination can only be a node the incoming view
+    // registered. Otherwise the outgoing one answers and the shape travels nowhere.
+    targets.forget(id);
+    setView(next);
+    const to = await targets.awaitTarget(id);
+
+    if (from === null || to === null) return;
+    if (!canMorph(from.rect, to.rect, Dimensions.get('window'))) return;
+
+    // Both ends come from the views that drew them, so the shape does not change appearance
+    // at the moment it takes off or the moment it is removed.
+    setMorph({
+      from: from.rect,
+      to: to.rect,
+      fromRadius: from.radius,
+      toRadius: to.radius,
+      fromColor: from.color,
+      toColor: to.color,
+    });
+  }
 
   async function remove(paperId: string): Promise<void> {
     // Optimistic: the row disappears immediately and is restored if the call fails, so the
@@ -159,14 +232,14 @@ export default function SavedScreen() {
             label={t('saved.viewLibrary')}
             selected={view === 'library'}
             tone="accent"
-            onPress={() => setView('library')}
+            onPress={() => void switchTo('library')}
             accessibilityLabel={`${t('saved.view')}: ${t('saved.viewLibrary')}`}
           />
           <Chip
             label={t('saved.viewCanvas')}
             selected={view === 'canvas'}
             tone="accent"
-            onPress={() => setView('canvas')}
+            onPress={() => void switchTo('canvas')}
             accessibilityLabel={`${t('saved.view')}: ${t('saved.viewCanvas')}`}
           />
         </View>
@@ -290,6 +363,9 @@ export default function SavedScreen() {
           // everything and left the screen looking empty with one card on it.
           renderItem={({ item }) => (
             <View
+              // The other end of the morph. Only the selected row is an endpoint, so this is
+              // the one ref created at the top of the screen rather than one per row.
+              ref={item.savedPaper.paperId === selectedPaperId ? rowRef : undefined}
               style={{
                 backgroundColor: theme.color.card,
                 borderColor:
@@ -374,6 +450,16 @@ export default function SavedScreen() {
               </View>
             </View>
           )}
+        />
+      )}
+
+      {/* Above both layouts and outside the switch, so the shape survives the view change
+          it is animating. Nothing is gated on it finishing. */}
+      {morph !== null && (
+        <MorphLayer
+          ends={morph}
+          durationMs={theme.duration('base')}
+          onDone={() => setMorph(null)}
         />
       )}
 
