@@ -46,15 +46,15 @@
       "note": "Purely algebraic, so the translator can read it and the numeric check actually fires. Equation (3) is deliberately wrong, so the pipeline has a step that must NOT pass."
     },
     {
-      "canonicalId": "arXiv:2601.00005",
+      "canonicalId": "arxiv:2604.14247",
       "file": "citing.tex",
       "bodyFormat": "latex",
       "licenseId": "CC-BY-4.0",
       "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
-      "sourceUrl": "https://example.invalid/abs/2601.00005",
+      "sourceUrl": "https://example.invalid/abs/2604.14247",
       "version": "v1",
       "expect": "permitted",
-      "note": "The only fixture that refers to other papers. Carries one of each reference form the extractor may match, and several it must refuse (bare year, bare surname, a contrastive phrase with no reference)."
+      "note": "The only fixture that refers to other papers. Carries one of each reference form the extractor may match, and several it must refuse (bare year, bare surname, a contrastive phrase with no reference). Unlike the entries above, its canonicalId is a paper that exists in papers.sample.json and every paper it refers to is in that corpus too — so `make seed` produces real relations rather than references pointing at nothing."
     }
   ]
 }

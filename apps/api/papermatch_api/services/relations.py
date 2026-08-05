@@ -497,8 +497,14 @@ def relations_for(
     changes as the library grows, and a reader looking at a paper today should see what is
     true today; the stored rows are the audit record of what was concluded and why.
     """
+    # Imported here rather than at module scope: `services.mentions` needs `Mention` from
+    # this module, and `Mention` belongs here because it is part of what `classify` accepts.
+    # This is the only place the dependency runs the other way.
+    from papermatch_api.services.mentions import mentions_for
+
     pool = candidate_pool(session, anchor, user_id)
-    classified = classify_all(anchor.year, candidates_for(session, anchor, pool))
+    found = mentions_for(session, anchor, pool)
+    classified = classify_all(anchor.year, candidates_for(session, anchor, pool, found))
     rows = refresh_relations(session, anchor, classified)
 
     by_id = {paper.id: paper for paper in pool}

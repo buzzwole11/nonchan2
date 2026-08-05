@@ -26,16 +26,25 @@ are separate questions this gate does not answer.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import uuid
+from dataclasses import dataclass, field
 
-from papermatch_api.providers.base import FullTextRecord
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from papermatch_api.models import AuditLog, Paper, PaperFullText
+from papermatch_api.providers.base import FullTextProvider, FullTextRecord
 
 __all__ = [
     "PERMITTED_LICENSES",
     "REFUSED_LICENSES",
+    "FullTextReport",
     "LicenceDecision",
     "licence_decision",
+    "load_full_texts",
     "may_build_math_cards",
+    "store_full_text",
+    "stored_body",
 ]
 
 #: Licences whose terms permit parsing the body and publishing derived formulas with
@@ -139,3 +148,119 @@ def licence_decision(record: FullTextRecord | None) -> LicenceDecision:
 def may_build_math_cards(record: FullTextRecord | None) -> bool:
     """Shorthand for callers that do not need the reason."""
     return licence_decision(record).permitted
+
+
+# ------------------------------------------------------------------ storage
+#
+# Everything above decides *whether* a body may be used. What follows keeps the ones that
+# may, so section 17's mention extraction has a text to read.
+
+
+def store_full_text(
+    session: Session, paper: Paper, record: FullTextRecord | None
+) -> PaperFullText | None:
+    """Keep this body, if the licence permits it. Returns None when it does not.
+
+    **Refusing is silent to the caller but not to the log.** `licence_decision` produces a
+    reason either way, and the caller writes it to the audit trail — "we have no body for
+    this paper" and "we were not allowed to keep one" are different facts and the second is
+    the one somebody will need to explain later.
+
+    A refused paper also has any *existing* row removed. A licence can change from permissive
+    to unknown between fetches (a paper is republished, a manifest is corrected), and leaving
+    the old body behind would mean the gate had been passed once and never again.
+    """
+    decision = licence_decision(record)
+    existing = session.get(PaperFullText, paper.id)
+
+    if not decision.permitted or record is None or decision.license_id is None:
+        if existing is not None:
+            session.delete(existing)
+            session.flush()
+        return None
+
+    if existing is None:
+        existing = PaperFullText(paper_id=paper.id)
+        session.add(existing)
+
+    existing.body_format = record.body_format
+    existing.body = record.body
+    existing.license_id = decision.license_id
+    existing.license_url = record.license_url
+    existing.source_url = record.source_url
+    existing.version = record.version
+    existing.retrieved_at = record.retrieved_at
+    session.flush()
+    return existing
+
+
+def stored_body(session: Session, paper_id: uuid.UUID) -> str | None:
+    """The stored body, or None. None means "no body", never "no permission" — that
+    distinction lives in the audit log, because a caller that could tell them apart here
+    would leak the licence state of papers it is not otherwise entitled to know about."""
+    row = session.get(PaperFullText, paper_id)
+    return None if row is None else row.body
+
+
+@dataclass
+class FullTextReport:
+    """What one pass over the corpus did, in the terms an operator asks about."""
+
+    stored: int = 0
+    #: The provider had nothing for this paper. Not a licence problem.
+    unavailable: int = 0
+    #: The provider had a body and the gate refused it, counted by `LicenceDecision.code`.
+    refused: dict[str, int] = field(default_factory=dict)
+
+
+def load_full_texts(
+    session: Session, provider: FullTextProvider, *, limit: int | None = None
+) -> FullTextReport:
+    """Fetch and store every body the licence permits, for the papers already ingested.
+
+    **Every refusal is written to the audit log with its reason.** Section 21 requires the
+    licence decision to be answerable later, and a body that is simply missing from the table
+    cannot say whether it was never offered or was offered and declined. The permitted case
+    is logged too, for the same reason: "permitted under CC-BY-4.0" is checkable, a row with
+    no explanation is not.
+
+    Idempotent — `store_full_text` replaces the row for a paper rather than adding one — so
+    this can be re-run after the fixtures change.
+    """
+    report = FullTextReport()
+    statement = select(Paper).order_by(Paper.acquired_at.asc())
+    if limit is not None:
+        statement = statement.limit(limit)
+
+    for paper in session.execute(statement).scalars():
+        record = provider.fetch_source(paper.canonical_id)
+        decision = licence_decision(record)
+        stored = store_full_text(session, paper, record)
+
+        if stored is not None:
+            report.stored += 1
+        elif record is None:
+            report.unavailable += 1
+        else:
+            report.refused[decision.code] = report.refused.get(decision.code, 0) + 1
+
+        if record is not None:
+            session.add(
+                AuditLog(
+                    kind="fulltext.licence_decision",
+                    actor="system",
+                    entity_type="paper",
+                    entity_id=str(paper.id),
+                    detail={
+                        "canonicalId": paper.canonical_id,
+                        "permitted": decision.permitted,
+                        "code": decision.code,
+                        "reason": decision.reason,
+                        "licenseId": decision.license_id,
+                        "provider": getattr(provider, "name", "unknown"),
+                    },
+                )
+            )
+
+    session.flush()
+    return report

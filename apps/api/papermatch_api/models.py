@@ -813,6 +813,36 @@ class CollectionItem(Base):
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
+class PaperFullText(Base, TimestampMixin):
+    """A paper's body, stored only when its licence permits it (spec sections 17, 21).
+
+    **The row's existence is the permission.** `services/fulltext.licence_decision` is the
+    gate; nothing that fails it is written here. `license_id` is therefore not nullable —
+    "we do not know the terms" is a reason to have no row, not a row with a blank.
+
+    The licence here is the **body's**, not the paper's metadata licence. arXiv metadata is
+    CC0 while the manuscript is under the author's own terms, and conflating the two is the
+    mistake the gate exists to prevent.
+    """
+
+    __tablename__ = "paper_full_texts"
+    __table_args__ = (
+        CheckConstraint("body_format IN ('latex', 'jats_xml')", name="ck_full_text_format"),
+        CheckConstraint("length(license_id) > 0", name="ck_full_text_license_present"),
+    )
+
+    paper_id: Mapped[uuid.UUID] = mapped_column(
+        UuidType, ForeignKey("papers.id", ondelete="CASCADE"), primary_key=True
+    )
+    body_format: Mapped[str] = mapped_column(String(32), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    license_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    license_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_url: Mapped[str] = mapped_column(Text, nullable=False)
+    version: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class AuditLog(Base):
     """Append-only record of consequential events (spec section 0: 監査ログ).
 

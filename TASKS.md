@@ -331,8 +331,13 @@ AI が要る項目は環境制約で未着手です（DECISIONS.md D-024）。
 - [x] **Library の関心度ソート**（`GET /saved?sort=interest`）— Canvas がタイルの大きさに
       使う `personal_weight` と同じ入力で並べる。平面で大きく見える論文が一覧で上に来る
       （14 節の「位置関係を失わない」は並びについても同じ）
-- [ ] 本文中の言及の抽出をパイプラインに接続（分類器は言及に対応済みだが、
-      全文を保存する仕組みがまだ無いため入力が空のまま）
+- [x] **本文中の言及の抽出をパイプラインに接続**（`text/citations.py`,
+      `services/mentions.py`, `paper_full_texts` / migration `0010`）—
+      ライセンスが許した本文だけを保存し、そこから**文単位で**言及を取り出す。
+      一致の規則は 3 つだけ（識別子 / 姓と年の同居 / ほぼ完全な題名）で、
+      迷うものは何も出さない。**対立の合図は言及文の中にあるものだけを見る**
+      （隣の文の合図は別の話かもしれない）。`make seed` の corpus で
+      `contrasting` が実データから出るところまで確認済み（DECISIONS.md D-061）
 - [x] **目的別読書ルート**（`services/reading_path.py`, `GET /papers/{id}/reading-path`,
       `src/reading/ReadingPathSheet.tsx`）— 全体を知る / 数式を追う / 結果だけ見る /
       引用に使えるか確認 の 4 つ。**本文は持っていないので、17 節の例にある

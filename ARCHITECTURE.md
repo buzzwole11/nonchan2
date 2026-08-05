@@ -22,7 +22,7 @@
                     │ SQLAlchemy
 ┌───────────────────▼────────────────────────┐
 │ PostgreSQL 16                              │
-│   26 tables · Alembic migrations           │
+│   28 tables · Alembic migrations           │
 └────────────────────────────────────────────┘
 
 packages/shared-types   ← 両側が読む型と語彙
@@ -208,7 +208,7 @@ POST /translations
 | 1 | arXiv / OpenAlex Provider | `providers/` に 2 ファイル + registry に登録。ルータは無変更 |
 | 1 | `/feed`、`/impressions`、`/actions`、`/saved` | `routers/` 追加。表示履歴テーブルは既に存在 |
 | 1 | スワイプデッキ、オンボーディング、翻訳シート | `apps/mobile/app/` |
-| 3 | ~~埋め込みと多様性スコア~~ 済 | `local_embedding` + `services/scoring`。残るは pgvector 列の migration（D-006） |
+| 3 | ~~埋め込みと多様性スコア~~ 済 | `local_embedding` + `services/scoring` + pgvector 列と HNSW 索引（migration `0009`、D-060） |
 | 4–5 | 数式カードと検証 | `Equation` / `DerivationStep` / `MathCard` は既にスキーマにある |
 | 6 | Canvas | `CanvasPosition` は既にスキーマにある |
 

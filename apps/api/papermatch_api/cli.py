@@ -16,7 +16,8 @@ from papermatch_api.config import get_settings
 from papermatch_api.db import session_scope
 from papermatch_api.models import Field
 from papermatch_api.providers.base import PaperQuery
-from papermatch_api.providers.registry import get_paper_provider
+from papermatch_api.providers.registry import get_fulltext_provider, get_paper_provider
+from papermatch_api.services.fulltext import load_full_texts
 from papermatch_api.services.ingestion import ingest, load_fields
 from papermatch_api.services.math_content import load_math_cards
 from papermatch_api.services.metrics import collect
@@ -36,6 +37,10 @@ def seed(limit: int) -> int:
         )
         # After the papers: a maths card names its paper by canonical id.
         math = load_math_cards(session, settings.fixtures_dir)
+        # And after those: a body is fetched per paper, and only kept when the licence
+        # permits it. Refusals are expected here and are recorded, not silently dropped.
+        bodies = load_full_texts(session, get_fulltext_provider())
+    refused = ", ".join(f"{code}={count}" for code, count in sorted(bodies.refused.items()))
     print(
         f"fields: {field_count}\n"
         f"papers inserted: {report.inserted}\n"
@@ -44,7 +49,10 @@ def seed(limit: int) -> int:
         f"skipped (licence unknown): {report.skipped_unlicensed}\n"
         f"maths cards: {math.cards} "
         f"({math.equations} equations, {math.symbols} symbols, {math.steps} steps; "
-        f"{math.unverified_steps} step(s) unverified and hidden by default)"
+        f"{math.unverified_steps} step(s) unverified and hidden by default)\n"
+        f"full texts stored: {bodies.stored} "
+        f"({bodies.unavailable} not offered"
+        f"{'; refused: ' + refused if refused else ''})"
     )
     if math.rejected_equations:
         print(f"formulas refused by the LaTeX check: {', '.join(math.rejected_equations)}")
