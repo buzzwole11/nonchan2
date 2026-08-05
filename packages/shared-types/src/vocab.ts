@@ -118,6 +118,8 @@ export const ACTION_TYPES = [
   'less_similar',
   'more_experimental',
   'more_classic',
+  /** Section 9: the app noting that it brought a saved paper back, so it does not again. */
+  'resurface_saved',
   'undo',
 ] as const;
 
@@ -138,6 +140,8 @@ export const FEED_REASONS = [
   'adjacent_field',
   'foundational',
   'recent',
+  /** Section 9: saved a while ago and never opened. A return, not a discovery. */
+  'saved_not_read',
 ] as const;
 
 export const TRANSLATION_STYLES = [

@@ -53,6 +53,7 @@ from papermatch_api.models import (
     SavedPaper,
     User,
 )
+from papermatch_api.services import resurface
 from papermatch_api.services.embeddings import embeddings_for
 from papermatch_api.services.scoring import (
     SIGNIFICANT_FIELD_WEIGHT,
@@ -675,6 +676,28 @@ def build_feed(
 
     page = snapshot[offset : offset + limit]
     has_more = len(snapshot) > offset + limit
+
+    # Section 9's 保存を墓場にしない再提示. Added to the page rather than taking a slot from
+    # it: section 16 fixes the 70/20/10 mix for *discovery*, and spending one of those slots
+    # would give the reader less of what they asked for while the counts still claimed
+    # 70/20/10. Only on the first page — a returning paper is a reminder, and a reminder that
+    # repeats every scroll is nagging.
+    if offset == 0 and page:
+        returning = resurface.pick(session, user, now)
+        if returning is not None:
+            resurface.record(session, user, returning.paper.id)
+            page = [
+                *page,
+                Candidate(
+                    paper=returning.paper,
+                    pool="resurfaced",
+                    score=0.0,
+                    # Labelled as a return. Presenting it as a fresh discovery is how a
+                    # reader learns to stop trusting the reasons.
+                    reasons=["saved_not_read"],
+                    breakdown={"quietDays": float(returning.quiet_days)},
+                ),
+            ]
     next_cursor = (
         FeedCursor(seed=seed, offset=offset + limit).encode() if has_more and page else None
     )
@@ -696,6 +719,9 @@ def reason_text(reasons: list[str], locale: str) -> str:
         "similar_to_saved": "保存した論文と近い分野です",
         "recent": "最近の研究です",
         "foundational": "基礎的・古典的な研究です",
+        # Section 9. Says that it is a return, not a find — a returning paper presented as a
+        # fresh discovery is how a reader learns to stop trusting these sentences.
+        "saved_not_read": "保存したまま、まだ読んでいません",
     }
     en = {
         "matches_field": "Matches a field you chose",
@@ -704,6 +730,7 @@ def reason_text(reasons: list[str], locale: str) -> str:
         "similar_to_saved": "Close to something you saved",
         "recent": "Recent work",
         "foundational": "Foundational or classic work",
+        "saved_not_read": "Saved a while ago and not opened yet",
     }
     table = ja if locale.startswith("ja") else en
     parts = [table[r] for r in reasons if r in table]

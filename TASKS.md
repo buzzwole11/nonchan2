@@ -125,6 +125,11 @@ AI が要る項目は環境制約で未着手です（DECISIONS.md D-024）。
 - [x] **用語・表現の保存**（`expression_cards`）— 単語 / 連語 / 構文 / 一文 の自動判定、
       文脈の保持、同一句のマージ
 - [x] **Learn タブと復習の再提示** — 2 択・固定間隔・点数なし（DECISIONS.md D-023）
+- [x] **保存論文の再提示**（`services/resurface.py`）— 保存したまま一度も開いていない論文を
+      Discover に戻す。**70/20/10 の枠は使わない**（16 節が固定しているのは発見の比率で、
+      枠を取ると読者の取り分が減るのに数字は 70/20/10 のまま）。**戻ってきたことを
+      ラベルに書く**。開いた・訳した・状態を変えた論文は戻さない。一度戻して開かれ
+      なかったら 14 日は放っておく（DECISIONS.md D-059）
 - [x] 翻訳シートからの「表現を保存」
 - [ ] 実翻訳 Provider の接続（`ExplanationProvider` 含む）— ネットワーク遮断のため未着手
 - [ ] Before you read（背景知識 3 項目、専門用語 3–5 項目）— AI 生成部分が必要
@@ -150,7 +155,10 @@ AI が要る項目は環境制約で未着手です（DECISIONS.md D-024）。
 - [x] 推薦理由の文言生成（単一スコアを見せない）— Phase 1 で実装済み。スコアラーとは語彙が別
 - [x] **フィード調整のフィードバック UI** — 16 節の 5 つすべて。うち 3 つは action type
       自体が無かったので追加（migration `0004`）。理論/実験の判定器も新規（DECISIONS.md D-033）
-- [ ] pgvector 列と HNSW インデックスの migration（DECISIONS.md D-006）
+- [ ] pgvector 列と HNSW インデックスの migration（DECISIONS.md D-006）—
+      **この環境の PostgreSQL に `vector` 拡張が入っていません**（`pg_available_extensions`
+      に無い）。`CREATE EXTENSION vector` を含む migration は空 DB への適用チェックで
+      落ちるため、書いても検証できません
 
 > **いま interest の項が平らである件。** 種データでも実データでも、arXiv provider は主分野に一律
 > 0.7、親に 0.2 を振ります（`providers/arxiv.py`）。興味の強さも既定が 1.0 です。したがって

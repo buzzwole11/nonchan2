@@ -101,6 +101,7 @@
       "less_similar",
       "more_experimental",
       "more_classic",
+      "resurface_saved",
       "undo"
     ]
   },
@@ -121,7 +122,14 @@
   },
   "feedReason": {
     "$note": "Section 6: recommendation reasons must be explainable, never a single opaque score.",
-    "values": ["similar_to_saved", "matches_field", "adjacent_field", "foundational", "recent"]
+    "values": [
+      "similar_to_saved",
+      "matches_field",
+      "adjacent_field",
+      "foundational",
+      "recent",
+      "saved_not_read"
+    ]
   },
   "translationStyle": {
     "$note": "Section 7: 翻訳設定.",
