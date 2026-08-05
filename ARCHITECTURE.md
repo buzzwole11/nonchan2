@@ -38,14 +38,14 @@ packages/design-tokens  ← UI が読む唯一の視覚定義
 
 `papermatch_api/providers/base.py` に 6 つの Protocol があります。
 
-| Interface | 役割 | Phase 0 の実装 |
+| Interface | 役割 | 現在の実装 |
 | --- | --- | --- |
-| `PaperProvider` | 論文メタデータ | `MockPaperProvider`（fixture） |
+| `PaperProvider` | 論文メタデータ | `MockPaperProvider` / `ArxivProvider` / `OpenAlexProvider` |
 | `TranslationProvider` | 選択範囲の翻訳 | `MockTranslationProvider` |
 | `EmbeddingProvider` | 意味ベクトル | `LocalEmbeddingProvider`（Phase 3・プロセス内） |
 | `ExplanationProvider` | AI 説明 | 未実装（Phase 2） |
-| `MathVerifier` | 数式変形の検証 | 未実装（Phase 5） |
-| `FullTextProvider` | 本文・LaTeX ソース | 未実装（Phase 5） |
+| `MathVerifier` | 数式変形の検証 | `mathcheck/`（数値抜き取り + 次元解析・プロセス内） |
+| `FullTextProvider` | 本文・LaTeX ソース | `MockFullTextProvider`（fixture。ライセンス判定は `services/fulltext.py`） |
 
 `LocalEmbeddingProvider` は代用品ではなく実装です（ハッシュ化 BoW・512 次元・決定的）。言い換えの検出は文埋め込みに劣りますが、16 節が類似度に求めているのは「次のカードがさっきのカードと同じ話か」で、これは共有された専門語彙として現れます。ホスト型モデルに差し替えるときは `embeddings` 行の `model` / `version` が変わるだけで、両者が混ざることはありません（D-006）。
 
@@ -85,21 +85,28 @@ papermatch_api/
   main.py            アプリ生成、CORS、統一エラー形式
   config.py          pydantic-settings。本番で既定の秘密鍵を拒否
   db.py              エンジンとセッション
-  models.py          26 テーブル（仕様書 23 節）
+  models.py          テーブル定義（仕様書 23 節）
   schemas.py         リクエスト/レスポンス（camelCase 変換）
   security.py        ゲスト JWT と current_user 依存
+  passwords.py       scrypt（コスト値はハッシュに同梱）
   vocab.py           enums.json のローダ
   cli.py             seed コマンド
-  routers/           health, auth, fields, papers, translations, feed, saved, equations
+  routers/           health, auth, fields, papers, translations, feed, saved, equations, canvas
   services/          ingestion（取り込み・重複統合・監査）, feed（枠配分・多様性・調整）,
                      scoring（推薦スコア）, embeddings（ベクトルの保存と読み出し）,
                      structure / method_kind（規則ベースの分類器）, activity, math_content,
                      worker（定期取り込みと撤回同期）, search（保存ライブラリの検索 — D-041）,
-                     reports（読者からの問題報告）, metrics（27 節の指標）
+                     reports（読者からの問題報告）, metrics（27 節の指標）,
+                     canvas（平面の安定座標）, relations（論文関係・根拠つき — D-053）,
+                     reading_path（目的別読書ルート — D-054）,
+                     equation_graph（数式知識グラフ — D-056）,
+                     derivation（導出候補と検証）, fulltext（ライセンス判定）,
+                     review（人手レビュー待ち行列）, notifications（配信可否の判定 — D-058）
   providers/         base（interface）, arxiv, openalex, local_embedding, mock_*, registry
-  text/              normalize, dedup, math_placeholders, latex_safety
-  mathcheck/         数値代入と次元解析
-alembic/versions/    0001_initial … 0005_ingestion_runs
+  text/              normalize, dedup, math_placeholders, latex_safety,
+                     latex_document / latex_expression（LaTeX → 検証可能な式）
+  mathcheck/         verify（数値代入・次元比較）, units（単位 → 基本次元 — D-057）
+alembic/versions/    0001_initial … 0007_login_and_notifications
 tests/
 ```
 
