@@ -23,9 +23,13 @@ from papermatch_api.schemas import (
     PaperOut,
     PaperRelationOut,
     PaperRelationsResponse,
+    ReadingPathResponse,
+    ReadingRouteOut,
+    ReadingStepOut,
     SourceProvenanceOut,
 )
 from papermatch_api.security import CurrentUser
+from papermatch_api.services.reading_path import routes_for
 from papermatch_api.services.relations import relations_for
 
 router = APIRouter(tags=["papers"])
@@ -173,5 +177,33 @@ def get_paper_relations(
                 paper=serialize_paper(target),
             )
             for target, row in pairs
+        ],
+    )
+
+
+@router.get("/papers/{paper_id}/reading-path", response_model=ReadingPathResponse)
+def get_reading_path(
+    paper_id: uuid.UUID,
+    user: CurrentUser,
+    db: Annotated[Session, Depends(get_db)],
+) -> ReadingPathResponse:
+    """Four routes through the paper, by what the reader came for (spec section 17).
+
+    All four in one response. The choice between them is a tap, and a request per purpose
+    would put a spinner between the reader and a decision they make in a second.
+    """
+    paper = db.execute(select(Paper).where(Paper.id == paper_id)).scalar_one_or_none()
+    if paper is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="paper_not_found")
+
+    return ReadingPathResponse(
+        paper_id=paper.id,
+        routes=[
+            ReadingRouteOut(
+                purpose=route.purpose,
+                steps=[ReadingStepOut(**step.__dict__) for step in route.steps],
+                missing=route.missing,
+            )
+            for route in routes_for(db, paper)
         ],
     )

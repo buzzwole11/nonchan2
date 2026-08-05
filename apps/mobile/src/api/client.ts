@@ -38,6 +38,7 @@ import type {
   SavedListResponse,
   SavedPaperResponse,
   PaperRelationsResponse,
+  ReadingPathResponse,
   SearchResponse,
   UndoResponse,
   UpdateSavedRequest,
@@ -277,6 +278,16 @@ export class ApiClient {
    */
   paperRelations(paperId: string): Promise<PaperRelationsResponse> {
     return this.request<PaperRelationsResponse>(`/papers/${paperId}/relations`);
+  }
+
+  /**
+   * All four reading routes for a paper (spec section 17).
+   *
+   * One request for all four: choosing between them is a tap, and a request per purpose
+   * would put a spinner between the reader and a decision they make in a second.
+   */
+  readingPath(paperId: string): Promise<ReadingPathResponse> {
+    return this.request<ReadingPathResponse>(`/papers/${paperId}/reading-path`);
   }
 
   // -- canvas (spec section 13) --------------------------------------------------

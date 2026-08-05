@@ -41,7 +41,7 @@ import {
   type SearchMatchField,
 } from '@papermatch/shared-types';
 
-import { queryKeys, savedQuery, searchQuery } from '../../src/api/queries';
+import { queryKeys, readingPathQuery, savedQuery, searchQuery } from '../../src/api/queries';
 import { useSession } from '../../src/api/session';
 import { CanvasView } from '../../src/canvas/CanvasView';
 import { MorphLayer } from '../../src/canvas/MorphLayer';
@@ -56,6 +56,7 @@ import { PressableRow } from '../../src/components/PressableRow';
 import { Text } from '../../src/components/Text';
 import { useDebounced } from '../../src/components/useDebounced';
 import { type MessageKey, translate } from '../../src/i18n';
+import { ReadingPathSheet } from '../../src/reading/ReadingPathSheet';
 import { ShareSheet } from '../../src/share/ShareSheet';
 import { useTheme } from '../../src/theme/ThemeProvider';
 
@@ -90,10 +91,13 @@ function SavedLibrary() {
   // saved entry together, and looking them up again could disagree with the row that was
   // tapped after a refetch.
   const [sharing, setSharing] = useState<Row | null>(null);
+  // The row whose reading routes are open. Held whole for the same reason as `sharing`.
+  const [routing, setRouting] = useState<Row | null>(null);
   // The shape in flight between the two views, or null when nothing is travelling.
   const [morph, setMorph] = useState<MorphEnds | null>(null);
   const queryClient = useQueryClient();
   const targets = useMorphTargets();
+  const readingPath = useQuery(readingPathQuery(api, routing?.paper.id ?? null));
   const rowRef = useMorphTarget(selectedPaperId, {
     radius: theme.radius.tile,
     color: theme.color.card,
@@ -404,6 +408,10 @@ function SavedLibrary() {
                 ))}
               </View>
 
+              {/* Sized to their labels and allowed to wrap, not split into equal columns.
+                  Five `flex: 1` buttons on a 390pt row squeezed each label into a
+                  one-character-wide vertical stack — the row was readable with three and
+                  broke silently when the fourth and fifth arrived. */}
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
                 <PressableRow
                   onPress={() =>
@@ -412,7 +420,7 @@ function SavedLibrary() {
                     )
                   }
                   accessibilityLabel={`${t('saved.selectRowA11y')}: ${item.paper.title}`}
-                  style={{ flex: 1 }}
+                  style={{ minWidth: 88 }}
                 >
                   <Text variant="caption" tone="secondary">
                     {item.savedPaper.paperId === selectedPaperId
@@ -423,16 +431,25 @@ function SavedLibrary() {
                 <PressableRow
                   onPress={() => void WebBrowser.openBrowserAsync(item.paper.sourceUrl)}
                   accessibilityLabel={`${t('a11y.openSourceButton')}: ${item.paper.title}`}
-                  style={{ flex: 1 }}
+                  style={{ minWidth: 88 }}
                 >
                   <Text variant="caption" tone="accent">
                     {t('discover.read')}
                   </Text>
                 </PressableRow>
                 <PressableRow
+                  onPress={() => setRouting(item)}
+                  accessibilityLabel={`${t('readingPath.open')}: ${item.paper.title}`}
+                  style={{ minWidth: 88 }}
+                >
+                  <Text variant="caption" tone="accent">
+                    {t('readingPath.open')}
+                  </Text>
+                </PressableRow>
+                <PressableRow
                   onPress={() => setSharing(item)}
                   accessibilityLabel={`${t('share.open')}: ${item.paper.title}`}
-                  style={{ flex: 1 }}
+                  style={{ minWidth: 88 }}
                 >
                   <Text variant="caption" tone="accent">
                     {t('share.open')}
@@ -441,7 +458,7 @@ function SavedLibrary() {
                 <PressableRow
                   onPress={() => void remove(item.savedPaper.paperId)}
                   accessibilityLabel={`${t('saved.remove')}: ${item.paper.title}`}
-                  style={{ flex: 1 }}
+                  style={{ minWidth: 88 }}
                 >
                   <Text variant="caption" tone="warning">
                     {t('saved.remove')}
@@ -460,6 +477,18 @@ function SavedLibrary() {
           ends={morph}
           durationMs={theme.duration('base')}
           onDone={() => setMorph(null)}
+        />
+      )}
+
+      {routing !== null && (
+        <ReadingPathSheet
+          visible
+          paper={routing.paper}
+          routes={readingPath.data?.routes ?? []}
+          locale={locale}
+          loading={readingPath.isFetching && readingPath.data === undefined}
+          onClose={() => setRouting(null)}
+          onOpenSource={(url) => void WebBrowser.openBrowserAsync(url)}
         />
       )}
 

@@ -706,6 +706,38 @@ class PaperRelationsResponse(CamelModel):
     relations: list[PaperRelationOut]
 
 
+class ReadingStepOut(CamelModel):
+    """One stop on a reading route (spec section 17).
+
+    `labelKey` is an i18n key, never prose — section 25 keeps UI strings on the client.
+    `held` is the load-bearing field: true means the app has this content, false means the
+    step is "open the paper and look", and the client must not render the two the same way.
+    """
+
+    kind: str
+    label_key: str
+    held: bool
+    section: str | None = None
+    start: int | None = None
+    end: int | None = None
+    equation_id: uuid.UUID | None = None
+    equation_number: str | None = None
+    detail: str | None = None
+
+
+class ReadingRouteOut(CamelModel):
+    purpose: str
+    steps: list[ReadingStepOut]
+    #: What this route could not cover, so the client can say so instead of implying
+    #: the route is the whole paper.
+    missing: list[str]
+
+
+class ReadingPathResponse(CamelModel):
+    paper_id: uuid.UUID
+    routes: list[ReadingRouteOut]
+
+
 class MoveTileRequest(CamelModel):
     x: float
     y: float

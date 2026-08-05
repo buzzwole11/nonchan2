@@ -44,6 +44,7 @@ export const queryKeys = {
   mathCards: () => ['math-cards'] as const,
   mathCard: (id: string) => ['math-card', id] as const,
   relations: (paperId: string) => ['relations', paperId] as const,
+  readingPath: (paperId: string) => ['reading-path', paperId] as const,
 };
 
 export function createQueryClient(): QueryClient {
@@ -134,6 +135,20 @@ export function relationsQuery(api: ApiClient, paperId: string | null) {
   return {
     queryKey: queryKeys.relations(paperId ?? ''),
     queryFn: () => api.paperRelations(paperId as string),
+    enabled: paperId !== null,
+  };
+}
+
+/**
+ * The four routes through a paper (spec section 17).
+ *
+ * Fetched when a sheet actually opens rather than with the library: four routes per row for
+ * a list of fifty is fifty requests nobody asked for.
+ */
+export function readingPathQuery(api: ApiClient, paperId: string | null) {
+  return {
+    queryKey: queryKeys.readingPath(paperId ?? ''),
+    queryFn: () => api.readingPath(paperId as string),
     enabled: paperId !== null,
   };
 }

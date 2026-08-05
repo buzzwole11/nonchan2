@@ -313,7 +313,12 @@ AI が要る項目は環境制約で未着手です（DECISIONS.md D-024）。
       保存し、UI にも表示する（DECISIONS.md D-053）
 - [ ] 本文中の言及の抽出をパイプラインに接続（分類器は言及に対応済みだが、
       全文を保存する仕組みがまだ無いため入力が空のまま）
-- [ ] 目的別読書ルート
+- [x] **目的別読書ルート**（`services/reading_path.py`, `GET /papers/{id}/reading-path`,
+      `src/reading/ReadingPathSheet.tsx`）— 全体を知る / 数式を追う / 結果だけ見る /
+      引用に使えるか確認 の 4 つ。**本文は持っていないので、17 節の例にある
+      「Figure 1」「Introduction 1〜3段落」は作らない**。各段は実際に持っているもの
+      （判定済み Abstract 文・抽出済み数式・メタデータ）を指すか、原論文への
+      引き渡しであることを明示する（`held`）（DECISIONS.md D-054）
 - [ ] Timeline 再生
 - [ ] 数式知識グラフ
 - [x] **共有画像の書き出し**（`src/share/shareCard.ts`, `src/share/ShareSheet.tsx`）—

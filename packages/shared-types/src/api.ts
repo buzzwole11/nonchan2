@@ -20,6 +20,7 @@ import type {
   Uuid,
 } from './models.ts';
 import type {
+  AbstractSection,
   ActionType,
   ExpressionKind,
   MathCardType,
@@ -234,6 +235,57 @@ export interface PaperRelationsResponse {
    * falling back to "papers that look similar" is the one thing section 17 forbids.
    */
   relations: PaperRelationHit[];
+}
+
+/**
+ * The four routes through a paper (spec section 17): 全体を知る / 数式を追う / 結果だけ見る /
+ * 引用に使えるか確認.
+ */
+export const READING_PURPOSES = [
+  'overview',
+  'follow_math',
+  'results_only',
+  'citation_check',
+] as const;
+
+export type ReadingPurpose = (typeof READING_PURPOSES)[number];
+
+/**
+ * One stop on a route.
+ *
+ * `held` is the field that carries the honesty of the whole feature: true means the app has
+ * this content, false means "open the paper and look". The app does not hold paper bodies,
+ * so a route can point at the abstract sentences and equations it extracted and no further —
+ * rendering an unheld step as though it were content would promise something that is not
+ * there.
+ */
+export interface ReadingStep {
+  kind: 'abstract_segment' | 'equation' | 'metadata' | 'external';
+  /** An i18n key. Section 25 keeps UI strings on the client. */
+  labelKey: string;
+  held: boolean;
+  section: AbstractSection | null;
+  start: number | null;
+  end: number | null;
+  equationId: Uuid | null;
+  equationNumber: string | null;
+  /** A factual value — a licence id, a URL, a venue. The same in every language. */
+  detail: string | null;
+}
+
+export interface ReadingRoute {
+  purpose: ReadingPurpose;
+  steps: ReadingStep[];
+  /**
+   * What this route could not cover. Always contains `full_text`, because the body of the
+   * paper is not something the app has ever seen.
+   */
+  missing: string[];
+}
+
+export interface ReadingPathResponse {
+  paperId: Uuid;
+  routes: ReadingRoute[];
 }
 
 export interface SavedPaperResponse {
