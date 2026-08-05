@@ -155,10 +155,10 @@ AI が要る項目は環境制約で未着手です（DECISIONS.md D-024）。
 - [x] 推薦理由の文言生成（単一スコアを見せない）— Phase 1 で実装済み。スコアラーとは語彙が別
 - [x] **フィード調整のフィードバック UI** — 16 節の 5 つすべて。うち 3 つは action type
       自体が無かったので追加（migration `0004`）。理論/実験の判定器も新規（DECISIONS.md D-033）
-- [ ] pgvector 列と HNSW インデックスの migration（DECISIONS.md D-006）—
-      **この環境の PostgreSQL に `vector` 拡張が入っていません**（`pg_available_extensions`
-      に無い）。`CREATE EXTENSION vector` を含む migration は空 DB への適用チェックで
-      落ちるため、書いても検証できません
+- [x] **pgvector 列と HNSW インデックス**（migration `0009`）— `vector_json` は記録のまま、
+      `vector_ann` は索引。書き込みは 1 箇所なのでずれない。cosine で張る
+      （`scoring` と `metrics` が cosine で比べているため）。
+      関係の候補プールを「同じ分野」から**近傍**へ差し替えた（DECISIONS.md D-060）
 
 > **いま interest の項が平らである件。** 種データでも実データでも、arXiv provider は主分野に一律
 > 0.7、親に 0.2 を振ります（`providers/arxiv.py`）。興味の強さも既定が 1.0 です。したがって

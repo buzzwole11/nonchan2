@@ -20,6 +20,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     JSON,
     BigInteger,
@@ -43,6 +44,10 @@ from papermatch_api import vocab
 
 #: JSONB on PostgreSQL, plain JSON elsewhere, so unit tests can use SQLite.
 JsonType = JSON().with_variant(JSONB(), "postgresql")
+
+#: Width of the ANN column. Mirrors `providers.local_embedding.DIMENSIONS`; a model of a
+#: different width needs its own column and index rather than sharing this one (D-006).
+ANN_DIMENSIONS = 512
 UuidType = UUID(as_uuid=True).with_variant(String(36), "sqlite")
 
 
@@ -714,6 +719,18 @@ class Embedding(Base):
             "entity_type IN ('paper', 'equation', 'expression')", name="ck_embedding_entity_type"
         ),
         CheckConstraint("dimensions > 0", name="ck_embedding_dimensions"),
+        # Declared here as well as in migration 0009 so `create_all` (which the test suite
+        # uses) produces the same schema Alembic does — otherwise a test could pass against
+        # a table that has no ANN index while production has one.
+        #
+        # Cosine, matching how `scoring` and `metrics` compare: an index built for L2 would
+        # answer a different question and quietly return a different neighbour set.
+        Index(
+            "ix_embeddings_vector_ann",
+            "vector_ann",
+            postgresql_using="hnsw",
+            postgresql_ops={"vector_ann": "vector_cosine_ops"},
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UuidType, primary_key=True, default=_uuid)
@@ -723,6 +740,19 @@ class Embedding(Base):
     version: Mapped[str] = mapped_column(String(32), nullable=False, default="v1")
     dimensions: Mapped[int] = mapped_column(Integer, nullable=False)
     vector_json: Mapped[list[float]] = mapped_column(JsonType, nullable=False)
+    #: The same numbers again, as a `pgvector` value, so PostgreSQL can index them
+    #: (migration 0009). **`vector_json` is the record; this is the index.** Null for a row
+    #: whose width is not `local_embedding.DIMENSIONS` — a `vector(512)` column cannot hold
+    #: a 384-wide vector, and such a row is not comparable to these anyway.
+    #:
+    #: Typed as JSON on SQLite so the model still imports where the extension is absent;
+    #: nothing reads it there.
+    vector_ann: Mapped[list[float] | None] = mapped_column(
+        # `JSON()` rather than `JsonType`: that one already carries a variant, and
+        # SQLAlchemy refuses a variant as a variant target.
+        Vector(ANN_DIMENSIONS).with_variant(JSON(), "sqlite"),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

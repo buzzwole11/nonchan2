@@ -18,7 +18,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from papermatch_api.models import Embedding, Paper
+from papermatch_api.models import ANN_DIMENSIONS, Embedding, Paper
 from papermatch_api.providers.local_embedding import (
     DIMENSIONS,
     MODEL_NAME,
@@ -26,11 +26,22 @@ from papermatch_api.providers.local_embedding import (
     embed,
 )
 
-__all__ = ["embedding_text", "embeddings_for", "store_paper_embedding"]
+__all__ = ["embedding_text", "embeddings_for", "nearest_papers", "store_paper_embedding"]
 
 
 def embedding_text(paper: Paper) -> str:
     return f"{paper.title}\n\n{paper.abstract}"
+
+
+def _ann(vector: list[float]) -> list[float] | None:
+    """The indexable copy, or None when this vector cannot go in the column.
+
+    Written in the same place as `vector_json` so the two cannot drift: a row whose index
+    entry disagreed with its record would return the wrong neighbours and nothing would say
+    so. A width the column cannot hold yields None rather than a truncated vector — the
+    honest outcome is "not indexed", not "indexed at the wrong coordinates".
+    """
+    return vector if len(vector) == ANN_DIMENSIONS else None
 
 
 def store_paper_embedding(session: Session, paper: Paper) -> Embedding:
@@ -54,6 +65,7 @@ def store_paper_embedding(session: Session, paper: Paper) -> Embedding:
     if existing is not None:
         existing.vector_json = vector
         existing.dimensions = len(vector)
+        existing.vector_ann = _ann(vector)
         return existing
 
     row = Embedding(
@@ -63,6 +75,7 @@ def store_paper_embedding(session: Session, paper: Paper) -> Embedding:
         version=MODEL_VERSION,
         dimensions=len(vector) or DIMENSIONS,
         vector_json=vector,
+        vector_ann=_ann(vector),
     )
     session.add(row)
     return row
@@ -86,3 +99,38 @@ def embeddings_for(session: Session, paper_ids: list[uuid.UUID]) -> dict[uuid.UU
         )
     ).scalars()
     return {row.entity_id: list(row.vector_json) for row in rows}
+
+
+def nearest_papers(
+    session: Session, vector: list[float], *, limit: int = 10, exclude: uuid.UUID | None = None
+) -> list[tuple[uuid.UUID, float]]:
+    """The closest papers by cosine distance, using the ANN index (migration 0009).
+
+    Returns `(paper_id, similarity)` with similarity in [-1, 1], **not** the distance
+    pgvector works in: every other module in this codebase talks about similarity, and a
+    function that returned the opposite ordering under a similar name is the kind of thing
+    that is wrong for months.
+
+    Only rows from this model and version are considered — the same rule `embeddings_for`
+    follows, and the reason `model` and `version` are in the unique key. A vector of the
+    wrong width returns nothing rather than an error: it is a caller mistake that must not
+    take down a feed request, and an empty neighbour list degrades to "no similarity
+    information", which the scorer already handles.
+    """
+    if len(vector) != ANN_DIMENSIONS:
+        return []
+
+    distance = Embedding.vector_ann.cosine_distance(vector).label("distance")
+    rows = session.execute(
+        select(Embedding.entity_id, distance)
+        .where(
+            Embedding.entity_type == "paper",
+            Embedding.model == MODEL_NAME,
+            Embedding.version == MODEL_VERSION,
+            Embedding.vector_ann.is_not(None),
+            *([Embedding.entity_id != exclude] if exclude is not None else []),
+        )
+        .order_by(distance)
+        .limit(limit)
+    ).all()
+    return [(entity_id, 1.0 - float(dist)) for entity_id, dist in rows]

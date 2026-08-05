@@ -508,6 +508,10 @@ def test_the_pool_puts_the_readers_own_library_first(db_session: Session) -> Non
     pool = candidate_pool(db_session, anchor, user.id)
 
     assert pool[0].canonical_id == "test:mine"
+    # Nothing here has an embedding, so the pool falls back to the field to reach past the
+    # reader's own library. The fallback applies whenever neighbours are missing — an
+    # earlier version made it conditional on an empty library, so a reader who had saved
+    # anything lost the reach entirely.
     assert stranger.id in {p.id for p in pool}
 
 
@@ -571,3 +575,36 @@ def test_an_unknown_paper_is_a_404(client: TestClient) -> None:
 
     missing = "11111111-1111-4111-8111-111111111111"
     assert client.get(f"/papers/{missing}/relations", headers=headers).status_code == 404
+
+
+@pytest.mark.integration
+@requires_db
+def test_the_pool_reaches_a_close_paper_in_another_field(db_session: Session) -> None:
+    """The reason the field proxy was replaced by the ANN index (migration 0009).
+
+    "Same primary field" was wrong in both directions: it admitted every unrelated paper
+    that happened to share a category, and missed every close one that did not. A paper
+    about the same subject filed under a different category is exactly the case the reader
+    wants and the old pool could never find.
+    """
+    user = User(is_guest=True)
+    db_session.add(user)
+    db_session.flush()
+
+    subject = "Concentration inequalities for non-reversible Markov chains and cutoff."
+    anchor = _paper(db_session, slug="ann-anchor", abstract=subject, field_id=None)
+    # Same subject, filed elsewhere. The old pool could not see this one.
+    elsewhere = _paper(
+        db_session,
+        slug="ann-elsewhere",
+        abstract=subject + " A second treatment of the same question.",
+        field_id=None,
+    )
+    elsewhere.primary_field_id = None
+    for paper in (anchor, elsewhere):
+        store_paper_embedding(db_session, paper)
+    db_session.flush()
+
+    pool = candidate_pool(db_session, anchor, user.id)
+
+    assert elsewhere.id in {p.id for p in pool}

@@ -58,6 +58,11 @@ def engine():  # type: ignore[no-untyped-def]
     from papermatch_api.models import Base
 
     engine = create_engine(TEST_DATABASE_URL)
+    # `create_all` cannot create an extension, and the `embeddings` table has a `vector`
+    # column (migration 0009). Done here so the schema the tests build matches the one
+    # Alembic builds.
+    with engine.begin() as connection:
+        connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
     # The schema under test is the one Alembic produces; tests assert on it in
     # test_migrations.py. Here we create it directly so a test run does not depend on
     # migration ordering.

@@ -39,12 +39,12 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
-from sqlalchemy import or_, select
+from sqlalchemy import ColumnElement, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from papermatch_api.models import Paper, PaperRelation, SavedPaper
 from papermatch_api.providers.local_embedding import MODEL_NAME, cosine
-from papermatch_api.services.embeddings import embeddings_for
+from papermatch_api.services.embeddings import embeddings_for, nearest_papers
 
 __all__ = [
     "CONTRAST_CUES",
@@ -341,18 +341,47 @@ def _has_reference_list(paper: Paper) -> bool:
 def candidate_pool(session: Session, anchor: Paper, user_id: uuid.UUID) -> list[Paper]:
     """Papers worth considering as relations of `anchor`.
 
-    The reader's own saved library first, then other papers in the same primary field. Their
-    library is where a relation is most useful — section 17 is about organising 保存論文の周辺
-    — and the field is the cheapest way to reach beyond it without scanning the corpus.
+    The reader's own saved library first — section 17 is about organising 保存論文の周辺 —
+    then the anchor's nearest neighbours by embedding, through the ANN index (migration
+    0009).
+
+    **Neighbours replaced "any paper in the same primary field".** That was a proxy chosen
+    when there was no index, and it was wrong in both directions: it admitted every
+    unrelated paper that happened to share a category, and missed every close one that did
+    not. Being a candidate is not a relation — `classify` still decides, and similarity on
+    its own still yields at most `related`.
     """
     saved_ids = set(
         session.execute(select(SavedPaper.paper_id).where(SavedPaper.user_id == user_id)).scalars()
     )
     saved_ids.discard(anchor.id)
 
-    conditions = [Paper.primary_field_id == anchor.primary_field_id]
+    anchor_vector = embeddings_for(session, [anchor.id]).get(anchor.id)
+    neighbour_ids = (
+        [
+            paper_id
+            for paper_id, _ in nearest_papers(
+                session, anchor_vector, limit=POOL_LIMIT, exclude=anchor.id
+            )
+        ]
+        if anchor_vector is not None
+        else []
+    )
+
+    conditions: list[ColumnElement[bool]] = []
     if saved_ids:
         conditions.append(Paper.id.in_(saved_ids))
+    if neighbour_ids:
+        conditions.append(Paper.id.in_(neighbour_ids))
+    else:
+        # No neighbours to be had — the anchor has no vector, or nothing else does. The
+        # field is the only remaining way to reach past the reader's own library, so it
+        # comes back as the fallback it always was.
+        #
+        # Applied whenever the neighbours are missing, not only when nothing is saved: an
+        # earlier version made it conditional on an empty library, which meant a reader who
+        # had saved anything lost the reach entirely.
+        conditions.append(Paper.primary_field_id == anchor.primary_field_id)
 
     rows = list(
         session.execute(
@@ -362,8 +391,9 @@ def candidate_pool(session: Session, anchor: Paper, user_id: uuid.UUID) -> list[
             .limit(POOL_LIMIT * 2)
         ).scalars()
     )
-    # Saved first, then by recency, so the bound below keeps the useful end.
-    rows.sort(key=lambda p: (p.id not in saved_ids, -p.year))
+    # Saved first, then nearest first, so the bound below keeps the useful end.
+    order = {paper_id: index for index, paper_id in enumerate(neighbour_ids)}
+    rows.sort(key=lambda p: (p.id not in saved_ids, order.get(p.id, len(order)), -p.year))
     return rows[:POOL_LIMIT]
 
 
