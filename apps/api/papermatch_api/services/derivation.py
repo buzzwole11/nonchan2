@@ -24,9 +24,24 @@ no way for a reader to tell which they are reading.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 
-from papermatch_api.mathcheck.verify import NumericCheck, combined_status, spot_check
+from papermatch_api.mathcheck.units import (
+    Dimension,
+    DimensionError,
+    dimension_of_expression,
+    parse_dimensions,
+    parse_unit,
+)
+from papermatch_api.mathcheck.verify import (
+    CheckOutcome,
+    DimensionCheck,
+    NumericCheck,
+    combined_status,
+    dimension_check,
+    spot_check,
+)
 from papermatch_api.text.latex_document import ExtractedEquation, LatexDocument
 from papermatch_api.text.latex_expression import translate_equation
 
@@ -86,6 +101,10 @@ class StepCandidate:
     detail: str
     #: Ranges the check sampled over, empty when no check ran. Part of the claim.
     sampled: dict[str, tuple[float, float]] | None = None
+    #: What the dimensional check concluded, or None when it could not run. Distinct from a
+    #: failure: "no symbol had a declared unit" and "the units do not balance" are different
+    #: answers and only the second says anything about the mathematics.
+    dimensional: str | None = None
 
     @property
     def provenance_kind(self) -> str:
@@ -137,9 +156,37 @@ def _substitute(expression: str, name: str, replacement: str) -> str:
     return re.sub(rf"\b{re.escape(name)}\b", f"({replacement})", expression)
 
 
+def _dimensions(
+    lhs: str, rhs: str, units: Mapping[str, Dimension]
+) -> tuple[CheckOutcome | None, str | None]:
+    """Run the dimensional check when the symbol table declared enough to run it.
+
+    Returns `(None, None)` when any variable involved has no declared unit — most papers,
+    most of the time. That is a refusal, not a failure: a dimensional verdict computed from
+    a guessed unit would raise a step's `verificationStatus` on evidence that does not
+    exist, and `mechanically_verified` is a label a reader is entitled to trust.
+    """
+    if not units:
+        return None, None
+    try:
+        left = dimension_of_expression(lhs, units)
+        right = dimension_of_expression(rhs, units)
+    except DimensionError as error:
+        # A finding about the mathematics, not a gap in our data: one side does not even
+        # make dimensional sense on its own.
+        return CheckOutcome(False, str(error)), f"次元が合わない: {error}"
+    if left is None or right is None:
+        return None, None
+
+    outcome = dimension_check(DimensionCheck(lhs=left, rhs=right))
+    return outcome, ("次元が一致" if outcome.passed else f"次元が不一致: {outcome.detail}")
+
+
 def _verify(
-    previous: ExtractedEquation, current: ExtractedEquation
-) -> tuple[str, str, dict[str, tuple[float, float]] | None]:
+    previous: ExtractedEquation,
+    current: ExtractedEquation,
+    units: Mapping[str, Dimension] | None = None,
+) -> tuple[str, str, dict[str, tuple[float, float]] | None, str | None]:
     """Try to check the step by substituting the first equation into the second.
 
     **A paper's equation is a definition, not an identity over a box.** `y = (a+b)/2`
@@ -164,6 +211,7 @@ def _verify(
             "unverified",
             f"{which}の式が対応範囲外の構文（積分・総和・極限など）のため機械的に確認できない",
             None,
+            None,
         )
 
     defined = before.defines
@@ -172,49 +220,100 @@ def _verify(
             "unverified",
             "前の式が 1 つの変数について解かれていないため、代入して確かめられない",
             None,
+            None,
         )
 
     if defined not in after.variables:
         # The second line does not mention what the first defined, so substituting says
         # nothing about it — the two are not a step in the sense this check can see.
-        return "unverified", f"後の式に {defined} が現れないため、代入しても比較にならない", None
+        return (
+            "unverified",
+            f"後の式に {defined} が現れないため、代入しても比較にならない",
+            None,
+            None,
+        )
 
     free = sorted((before.rhs_variables | after.variables) - {defined})
     variables = dict.fromkeys(free, DEFAULT_SAMPLE_RANGE)
 
+    substituted_lhs = _substitute(after.lhs, defined, before.rhs)
+    substituted_rhs = _substitute(after.rhs, defined, before.rhs)
+
     outcome = spot_check(
-        NumericCheck(
-            lhs=_substitute(after.lhs, defined, before.rhs),
-            rhs=_substitute(after.rhs, defined, before.rhs),
-            variables=variables,
-        )
+        NumericCheck(lhs=substituted_lhs, rhs=substituted_rhs, variables=variables)
     )
+    # Section 12's 次元解析, run on the same substituted expressions the numeric check saw.
+    # It is an *independent* check — a wrong step has to survive both sampling and
+    # dimensional bookkeeping — which is why passing both is what earns
+    # `mechanically_verified` rather than either alone.
+    dimensional, dimensional_detail = _dimensions(substituted_lhs, substituted_rhs, units or {})
+
     if not outcome.passed:
-        return "unverified", f"代入後に一致しなかった: {outcome.detail}", variables
+        return (
+            "unverified",
+            f"代入後に一致しなかった: {outcome.detail}",
+            variables,
+            dimensional_detail,
+        )
 
-    # `combined_status` with no dimensional check gives `numerically_spot_checked`, which
-    # is the honest ceiling here: nothing dimensional was supplied and no symbolic
-    # manipulation was performed, so `mechanically_verified` would overstate what ran.
+    detail = f"{defined} を代入し、標本点 {outcome.evaluated} 点で一致"
+    if dimensional_detail is not None:
+        detail = f"{detail}。{dimensional_detail}"
+    elif units:
+        # Said out loud: "we checked the numbers" and "we checked the numbers and the units"
+        # are different claims, and the ceiling here is the first one.
+        detail = f"{detail}。単位の宣言が足りず次元解析は実行していない"
+
     return (
-        combined_status(outcome, None),
-        f"{defined} を代入し、標本点 {outcome.evaluated} 点で一致",
+        combined_status(outcome, dimensional),
+        detail,
         variables,
+        dimensional_detail,
     )
 
 
-def candidates_for(document: LatexDocument) -> list[StepCandidate]:
+def units_from_symbols(
+    symbols: Mapping[str, str | None], notation: str = "si"
+) -> dict[str, Dimension]:
+    """Symbol table units → base dimensions, dropping every entry that cannot be read.
+
+    `notation` says which spelling this corpus uses: `si` for unit symbols (`m/s^2`) or
+    `dimensions` for base-dimension letters (`L / T^2`). It is a parameter rather than
+    something detected, because `T` is tesla in the first and time in the second and no
+    amount of looking at the string resolves that — the caller knows its own data.
+
+    Dropping rather than defaulting. A symbol whose unit is missing, or written as
+    「arb. units」, contributes nothing, and the dimensional check then declines to run for
+    any expression that mentions it — which is the correct outcome, because nobody told us
+    what it is.
+    """
+    read = parse_dimensions if notation == "dimensions" else parse_unit
+    units: dict[str, Dimension] = {}
+    for name, unit in symbols.items():
+        dimension = read(unit)
+        if dimension is not None:
+            units[name] = dimension
+    return units
+
+
+def candidates_for(
+    document: LatexDocument, units: Mapping[str, Dimension] | None = None
+) -> list[StepCandidate]:
     """Propose a step between each consecutive pair of equations in ``document``.
 
     Consecutive rather than every pair: a paper's equations are written in the order the
     argument runs, and a link between equation 1 and equation 7 is a claim about structure
     that this stage has no evidence for.
+
+    `units` maps a variable name to its base dimensions, from `units_from_symbols`. Absent
+    or empty means no dimensional check runs — see `_dimensions`.
     """
     candidates: list[StepCandidate] = []
     for index in range(len(document.equations) - 1):
         previous = document.equations[index]
         current = document.equations[index + 1]
         operation = _connective(previous, current)
-        status, detail, sampled = _verify(previous, current)
+        status, detail, sampled, dimensional = _verify(previous, current, units)
         candidates.append(
             StepCandidate(
                 from_index=index,
@@ -226,6 +325,7 @@ def candidates_for(document: LatexDocument) -> list[StepCandidate]:
                 verification_status=status,
                 detail=detail,
                 sampled=sampled,
+                dimensional=dimensional,
             )
         )
     return candidates

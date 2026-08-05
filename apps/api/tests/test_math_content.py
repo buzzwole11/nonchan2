@@ -26,7 +26,7 @@ from papermatch_api.services.equations import (
     symbols_for,
     visible_equations,
 )
-from papermatch_api.services.math_content import load_math_cards, status_for_step
+from papermatch_api.services.math_content import load_math_cards, status_for_step, units_in
 from papermatch_api.text.latex_safety import check_latex
 from tests.conftest import FIXTURES_DIR, requires_db
 
@@ -34,6 +34,12 @@ DOCUMENT: dict[str, Any] = json.loads(
     (Path(FIXTURES_DIR) / "math-cards.json").read_text(encoding="utf-8")
 )
 CARDS: list[dict[str, Any]] = DOCUMENT["cards"]
+
+
+def _card(key: str) -> dict[str, Any]:
+    return next(card for card in CARDS if card["key"] == key)
+
+
 STEPS: list[tuple[str, dict[str, Any]]] = [
     (f"{card['key']}:{step['operation'][:20]}", step)
     for card in CARDS
@@ -318,3 +324,45 @@ def test_the_visible_set_is_every_status_except_unverified() -> None:
     assert is_default_visible("human_reviewed")
     assert not is_default_visible("unverified")
     assert "unverified" not in DEFAULT_VISIBLE_STATUSES
+
+
+# ------------------------------------------------------------------ dimensions from symbols
+
+
+def test_units_are_read_from_the_symbol_table_rather_than_written_out_again() -> None:
+    """Section 12's 次元解析, fed from the symbols the card already carries.
+
+    The fixtures declare a `dimensionCheck` per step, which is the same fact written a
+    second time. Two hand-written copies drift, and the one that drifts is the one nobody
+    looks at — so when a step has no explicit check, the units on its symbols supply one.
+    """
+    entry = _card("gaussian-integral")
+    units = units_in(entry)
+
+    assert units["a"] == {"L": -2}
+    assert units["r"] == {"L": 1}
+
+
+def test_a_step_with_no_declared_dimension_check_gets_one_from_the_symbols() -> None:
+    entry = _card("relativistic-limit")
+    step = next(s for s in entry["steps"] if s.get("numericCheck"))
+    without = {key: value for key, value in step.items() if key != "dimensionCheck"}
+
+    status, evidence = status_for_step(without, units_in(entry))
+
+    assert status == "mechanically_verified"
+    assert evidence["dimensional"]["source"] == "symbol_table"
+
+
+def test_a_step_whose_variables_are_not_all_declared_gets_no_dimensional_verdict() -> None:
+    # The polar-coordinates step samples an angle, which has no unit in the table. Refusing
+    # is right: a verdict computed from a guessed unit would raise the step's status on
+    # evidence that does not exist.
+    entry = _card("gaussian-integral")
+    step = next(s for s in entry["steps"] if s["to"] == "gauss-polar")
+    without = {key: value for key, value in step.items() if key != "dimensionCheck"}
+
+    status, evidence = status_for_step(without, units_in(entry))
+
+    assert status == "numerically_spot_checked"
+    assert "dimensional" not in evidence

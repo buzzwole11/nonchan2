@@ -15,6 +15,7 @@ from papermatch_api.providers.mock_fulltext import MockFullTextProvider
 from papermatch_api.services.derivation import (
     candidates_for,
     classify_relation,
+    units_from_symbols,
 )
 from papermatch_api.text.latex_document import parse_document
 from tests.conftest import FIXTURES_DIR
@@ -149,3 +150,58 @@ def test_the_operation_text_leads_with_the_operation() -> None:
     first = _candidates("arXiv:2601.00004")[0]
 
     assert first.operation.startswith("Expanding the fraction")
+
+
+# ------------------------------------------------------------------ dimensional analysis
+
+
+def _document(canonical_id: str):  # type: ignore[no-untyped-def]
+    provider = MockFullTextProvider(Path(FIXTURES_DIR))
+    record = provider.fetch_source(canonical_id)
+    assert record is not None
+    return parse_document(record.body)
+
+
+def test_declared_units_raise_a_step_from_spot_checked_to_mechanically_verified() -> None:
+    """Two independent checks agreeing is a stronger claim than either alone.
+
+    This is the connection section 12 asks for: the dimensional analysis in `mathcheck` was
+    implemented and had nothing feeding it, so no step could ever get past
+    `numerically_spot_checked`.
+    """
+    document = _document("arXiv:2601.00004")
+    plain = candidates_for(document)[0]
+
+    names = sorted(set(plain.sampled or {}))
+    # Every free variable declared dimensionless: a real declaration, and the weakest one
+    # that lets the check run at all.
+    units = units_from_symbols(dict.fromkeys(names, "1"))
+    with_units = candidates_for(document, units)[0]
+
+    assert plain.verification_status == "numerically_spot_checked"
+    assert with_units.verification_status == "mechanically_verified"
+    assert with_units.dimensional == "次元が一致"
+
+
+def test_without_declared_units_nothing_claims_a_dimensional_check_ran() -> None:
+    # The failure this guards against is silent: a step labelled `mechanically_verified`
+    # when only the numbers were ever looked at.
+    first = candidates_for(_document("arXiv:2601.00004"))[0]
+
+    assert first.dimensional is None
+    assert first.verification_status == "numerically_spot_checked"
+
+
+def test_units_that_do_not_balance_are_reported_rather_than_ignored() -> None:
+    document = _document("arXiv:2601.00004")
+    names = sorted(set(candidates_for(document)[0].sampled or {}))
+    # One variable given a length and the rest a time: the sides cannot both be right.
+    units = units_from_symbols(
+        {name: ("m" if index == 0 else "s") for index, name in enumerate(names)}
+    )
+
+    first = candidates_for(document, units)[0]
+
+    assert first.verification_status != "mechanically_verified"
+    assert first.dimensional is not None
+    assert "次元" in first.dimensional

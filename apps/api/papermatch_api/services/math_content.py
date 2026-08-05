@@ -19,6 +19,7 @@ later reader would assume everything present is displayable.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -27,16 +28,21 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from papermatch_api.mathcheck import (
+    CheckOutcome,
+    Dimension,
     DimensionCheck,
+    DimensionError,
     NumericCheck,
     combined_status,
     dimension_check,
+    dimension_of_expression,
     spot_check,
 )
 from papermatch_api.models import DerivationStep, Equation, EquationSymbol, MathCard, Paper
+from papermatch_api.services.derivation import units_from_symbols
 from papermatch_api.text.latex_safety import check_latex
 
-__all__ = ["MathContentReport", "load_math_cards", "status_for_step"]
+__all__ = ["MathContentReport", "load_math_cards", "status_for_step", "units_in"]
 
 
 @dataclass
@@ -59,7 +65,25 @@ class MathContentReport:
             self.missing_papers = []
 
 
-def status_for_step(step: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+def units_in(entry: dict[str, Any]) -> dict[str, Dimension]:
+    """Base dimensions for every symbol in this card that declared a readable unit.
+
+    Read from the symbol table the card already carries, rather than asking the fixture to
+    write the exponents out a second time. Two hand-written copies of the same fact drift,
+    and the one that drifts is the one nobody looks at.
+    """
+    declared: dict[str, str | None] = {}
+    for equation in entry.get("equations", []):
+        for symbol in equation.get("symbols", []):
+            declared.setdefault(symbol["symbol"], symbol.get("unit"))
+    # This corpus writes base-dimension letters (`M L / T`), not SI unit symbols. Told
+    # explicitly, because `T` means tesla in one notation and time in the other.
+    return units_from_symbols(declared, notation="dimensions")
+
+
+def status_for_step(
+    step: dict[str, Any], units: Mapping[str, Dimension] | None = None
+) -> tuple[str, dict[str, Any]]:
     """Run whatever checks the step declares and return the status it earned.
 
     Also returns the evidence, which is stored on the step's ``generation`` column. A
@@ -100,7 +124,31 @@ def status_for_step(step: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         evidence["dimensional"] = {
             "passed": dimensional.passed,
             "detail": dimensional.detail,
+            "source": "declared",
         }
+    elif units and numeric_spec is not None:
+        # Derived from the symbol table rather than written out again (section 12: 次元解析).
+        # Only runs when every variable on both sides has a readable unit — a dimension
+        # computed from a guessed unit would raise the step's status on evidence that does
+        # not exist.
+        try:
+            left = dimension_of_expression(numeric_spec["lhs"], units)
+            right = dimension_of_expression(numeric_spec["rhs"], units)
+        except DimensionError as error:
+            dimensional = CheckOutcome(False, str(error))
+            evidence["dimensional"] = {
+                "passed": False,
+                "detail": str(error),
+                "source": "symbol_table",
+            }
+        else:
+            if left is not None and right is not None:
+                dimensional = dimension_check(DimensionCheck(lhs=left, rhs=right))
+                evidence["dimensional"] = {
+                    "passed": dimensional.passed,
+                    "detail": dimensional.detail,
+                    "source": "symbol_table",
+                }
 
     status = combined_status(numeric, dimensional)
     evidence["status"] = status
@@ -204,7 +252,7 @@ def _replace_card(
         if source is None or target is None:
             continue
 
-        status, evidence = status_for_step(spec)
+        status, evidence = status_for_step(spec, units_in(entry))
         if status == "unverified":
             report.unverified_steps += 1
 
