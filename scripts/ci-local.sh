@@ -41,6 +41,8 @@ node scripts/generate-fixtures.mjs
 git diff --exit-code fixtures/papers.sample.json
 node scripts/build-katex-runtime.mjs
 git diff --exit-code apps/mobile/src/math/katexRuntime.ts
+node scripts/build-mathjax-runtime.mjs
+git diff --exit-code apps/mobile/src/math/mathjaxRuntime.ts
 
 # -------------------------------------------------------------------------------- Python
 

@@ -19,8 +19,14 @@
  *
  * When the server has already refused the formula (`renderable === false`), no WebView is
  * created at all: the LaTeX source is shown as text with the reason. That is spec section
- * 11's fallback and it costs nothing to reach — no engine is started for a string we have
- * already decided not to typeset.
+ * 11's last fallback and it costs nothing to reach — no engine is started for a string we
+ * have already decided not to typeset.
+ *
+ * **The three tiers of section 11 are a state machine held here.** KaTeX renders first; if
+ * it reports a failure for this particular formula, the document is rebuilt with MathJax;
+ * if that fails too, the LaTeX source is shown. Escalation happens per formula and resets
+ * when the formula changes, so one hard equation does not make every later one pay MathJax's
+ * parse cost (DECISIONS.md D-062).
  */
 
 import { useCallback, useMemo, useState } from 'react';
@@ -37,7 +43,13 @@ import type { ProvenanceKind } from '@papermatch/shared-types';
 import { Text } from '../components/Text';
 import { type MessageKey, translate } from '../i18n';
 import { useTheme } from '../theme/ThemeProvider';
-import { MATH_MESSAGE_KIND, type MathRenderResult, buildMathDocument } from './document';
+import {
+  MATH_MESSAGE_KIND,
+  type MathEngine,
+  type MathRenderResult,
+  buildMathDocument,
+} from './document';
+import { buildMathJaxDocument } from './mathjaxDocument';
 import { MathFrame } from './MathFrame';
 import { useFormulaZoom } from './formulaZoom';
 
@@ -95,7 +107,20 @@ export function MathView({
   const theme = useTheme();
   const [height, setHeight] = useState(INITIAL_HEIGHT);
   const [failed, setFailed] = useState(false);
+  // Spec section 11's three tiers, in order. KaTeX first because it is a tenth of the size
+  // and handles almost everything; MathJax only once KaTeX has said no to *this* formula,
+  // so the ~2MB script is never parsed on the common path (DECISIONS.md D-062).
+  const [engine, setEngine] = useState<MathEngine>('katex');
   const t = (key: MessageKey) => translate(locale, key);
+
+  // A new formula starts at the first tier again. Without this, one formula that needed
+  // MathJax would leave every later formula in the same view paying for it.
+  const [renderedLatex, setRenderedLatex] = useState(latex);
+  if (renderedLatex !== latex) {
+    setRenderedLatex(latex);
+    setEngine('katex');
+    setFailed(false);
+  }
 
   // No provider above means no screen to open over, so the formula is simply not tappable
   // rather than tappable-and-doing-nothing.
@@ -112,19 +137,20 @@ export function MathView({
           })
       : undefined;
 
-  const html = useMemo(
-    () =>
-      buildMathDocument(latex, {
-        display,
-        // Already multiplied by the clamped Dynamic Type scale, so the formula grows with
-        // the text around it (spec section 20); `fontScale` is the reader's own zoom on top.
-        fontSize: theme.type('abstract').fontSize * fontScale,
-        color: theme.color.textPrimary,
-        backgroundColor: 'transparent',
-        ariaLabel: accessibilityLabel,
-      }),
-    [latex, display, theme, accessibilityLabel, fontScale],
-  );
+  const html = useMemo(() => {
+    const options = {
+      display,
+      // Already multiplied by the clamped Dynamic Type scale, so the formula grows with
+      // the text around it (spec section 20); `fontScale` is the reader's own zoom on top.
+      fontSize: theme.type('abstract').fontSize * fontScale,
+      color: theme.color.textPrimary,
+      backgroundColor: 'transparent',
+      ariaLabel: accessibilityLabel,
+    };
+    return engine === 'mathjax'
+      ? buildMathJaxDocument(latex, options)
+      : buildMathDocument(latex, options);
+  }, [latex, display, theme, accessibilityLabel, fontScale, engine]);
 
   const onMessage = useCallback(
     (raw: string) => {
@@ -137,13 +163,27 @@ export function MathView({
         return;
       }
       if (result.kind !== MATH_MESSAGE_KIND) return;
+      // A message from a document we have already replaced. Acting on it would take the
+      // view back to a tier it left, or resize it to a height that is no longer the
+      // formula's — both of which look like the renderer flickering.
+      if (result.engine !== undefined && result.engine !== engine) return;
       if (typeof result.height === 'number' && result.height > 0) {
         setHeight(Math.min(result.height + 4, maxHeight));
       }
+
+      if (result.ok === false && engine === 'katex') {
+        // Spec section 11's second tier. Not a failure the reader is told about yet:
+        // MathJax may well typeset this, and saying "could not render" and then rendering
+        // it is worse than saying nothing for a moment.
+        setEngine('mathjax');
+        setFailed(false);
+        return;
+      }
+
       setFailed(result.ok === false);
       onOverflowChange?.(result.overflow === true);
     },
-    [maxHeight, onOverflowChange],
+    [maxHeight, onOverflowChange, engine],
   );
 
   if (!renderable) {

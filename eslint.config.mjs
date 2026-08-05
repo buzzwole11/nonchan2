@@ -30,6 +30,8 @@ export default tseslint.config(
       'fixtures/**',
       // Generated: 650KB of minified KaTeX, regenerated and diffed by CI.
       'apps/mobile/src/math/katexRuntime.ts',
+      // The same: 2MB of minified MathJax, spec section 11's second tier.
+      'apps/mobile/src/math/mathjaxRuntime.ts',
     ],
   },
 

@@ -215,8 +215,13 @@ AI が要る項目は環境制約で未着手です（DECISIONS.md D-024）。
       - [ ] テーマ切り替えで背景が白く残らない（Android の透過 WebView）
       - [ ] VoiceOver / TalkBack が各式をラベルとして読み上げる（マークアップを読み上げない）
       - [ ] 機内モードでも組版される（同梱の確認）
-- [ ] MathJax へのフォールバック — 同梱で約 1MB 増。KaTeX が扱えない構文の大半はサーバ側で
-      弾いており、信頼上効いているのはソース表示（実装済み）なので後回し
+- [x] **MathJax へのフォールバック**（`src/math/mathjaxDocument.ts`,
+      `scripts/build-mathjax-runtime.mjs`）— 仕様書 11 節の 3 段（KaTeX → MathJax →
+      ソース表示）が全部つながった。**KaTeX が拒否した式に対してだけ** MathJax の文書に
+      組み直すので、通常の経路は 2MB のスクリプトを読まない。実測で 5 種類
+      （`\buildrel` `\atopwithdelims` `\eqalign` `\strut` `multline`）が
+      KaTeX 不可・MathJax 可。Chromium で確認：ネットワーク要求 0 件、スクリプト注入なし、
+      `\href` は 3 段目に落ちて `<a>` を作らない（DECISIONS.md D-062）
 - [x] **タップで全画面、LaTeX コピー、フォント拡大**（`src/math/FormulaSheet.tsx`、
       `FormulaZoomProvider.tsx`）— シートはアプリ全体で 1 つ、root に置くのでどの数式も
       全画面になる。由来ラベルをシートに含める（カードから離れると失われるため）。

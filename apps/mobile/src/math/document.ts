@@ -56,9 +56,20 @@ export interface MathDocumentOptions {
   ariaLabel?: string;
 }
 
+/**
+ * Which of spec section 11's engines produced a result.
+ *
+ * Carried on every message so `MathView` cannot mistake a late message from the KaTeX
+ * document for the MathJax one's verdict — escalating replaces the document, and a stale
+ * message arriving afterwards would otherwise send the view back to a tier it had left.
+ */
+export type MathEngine = 'katex' | 'mathjax';
+
 /** What the WebView posts back once it has tried to render. */
 export interface MathRenderResult {
   ok: boolean;
+  /** Which engine this result is about. Absent only from a document built before D-062. */
+  engine?: MathEngine;
   /** Height in CSS pixels, so the native side can size the view to its content. */
   height: number;
   /**
@@ -112,6 +123,7 @@ export function buildMathDocument(latex: string, options: MathDocumentOptions = 
     display,
     label: ariaLabel ?? null,
     kind: MATH_MESSAGE_KIND,
+    engine: 'katex' satisfies MathEngine,
   });
 
   return `<!doctype html>
@@ -227,15 +239,18 @@ export function buildMathDocument(latex: string, options: MathDocumentOptions = 
       root.setAttribute('aria-label', data.label);
     }
 
-    post({ kind: data.kind, ok: true, height: height(), overflow: overflows() });
+    post({ kind: data.kind, engine: data.engine, ok: true, height: height(), overflow: overflows() });
   } catch (error) {
-    // Spec section 11: 失敗時は整形済みLaTeXソース. Shown, not hidden — a reader who can
-    // see the source can still check the paper, and a blank space tells them nothing.
+    // The source is shown *here* as well as reported, because this document may be the
+    // last word: MathView escalates to MathJax (spec section 11's second tier) only when
+    // it is mounted with an escalation path. Where it is not, a reader who can see the
+    // source can still check the paper, and a blank space tells them nothing.
     root.style.display = 'none';
     fallback.style.display = 'block';
     fallback.textContent = data.latex;
     post({
       kind: data.kind,
+      engine: data.engine,
       ok: false,
       height: height(),
       error: String((error && error.message) || error),
