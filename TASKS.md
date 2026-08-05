@@ -325,7 +325,10 @@ AI が要る項目は環境制約で未着手です（DECISIONS.md D-024）。
 - [x] **Timeline 再生**（`src/canvas/timeline.ts`）— 月単位で保存履歴を再生し、
       **分野数**で関心の広がりを出す（論文数は同じ場所を読み続けても増える）。
       ボタン操作（スライダーはジェスチャー）（DECISIONS.md D-055）
-- [ ] 数式知識グラフ
+- [x] **数式知識グラフ**（`services/equation_graph.py`, `GET /papers/{id}/equation-graph`,
+      `src/math/EquationGraphTab.tsx`）— 辺は**記録された記号の定義と導出手順だけ**。
+      字が同じ 2 式は結ばない（`n` は何にでも出る）。未検証の辺は隠さずラベルを付ける
+      （隠すと「無関係」と黙って主張することになる）（DECISIONS.md D-056）
 - [x] **共有画像の書き出し**（`src/share/shareCard.ts`, `src/share/ShareSheet.tsx`）—
       **私的な項目（自分のメモ・保存理由）は既定で off、それ以外は既定で on**。
       閲覧履歴はそもそも選択肢に無い。カードは**除外したものを名指しで表示する**

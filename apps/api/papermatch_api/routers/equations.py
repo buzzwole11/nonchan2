@@ -26,7 +26,10 @@ from papermatch_api.db import get_db
 from papermatch_api.models import DerivationStep, Equation, MathCard, Paper, User
 from papermatch_api.schemas import (
     DerivationStepOut,
+    EquationEdgeOut,
+    EquationGraphResponse,
     EquationListResponse,
+    EquationNodeOut,
     EquationOut,
     EquationSymbolOut,
     MathCardDetailResponse,
@@ -36,6 +39,7 @@ from papermatch_api.schemas import (
     ReportResponse,
 )
 from papermatch_api.security import current_user
+from papermatch_api.services.equation_graph import graph_for_paper
 from papermatch_api.services.equations import (
     derivation_steps_for,
     renderable,
@@ -210,4 +214,43 @@ def report_math_card(
         entity_type=outcome.report.entity_type,
         entity_id=outcome.report.entity_id,
         already_reported=outcome.repeated,
+    )
+
+
+@router.get("/papers/{paper_id}/equation-graph", response_model=EquationGraphResponse)
+def get_equation_graph(
+    paper_id: uuid.UUID,
+    db: Annotated[Session, Depends(get_db)],
+) -> EquationGraphResponse:
+    """How this paper's equations depend on each other (spec section 28, Phase 7).
+
+    Edges come only from recorded symbol definitions and derivation steps. Two equations
+    that merely share a letter are not connected — see `services/equation_graph.py`.
+    """
+    graph = graph_for_paper(db, paper_id)
+    return EquationGraphResponse(
+        paper_id=paper_id,
+        nodes=[
+            EquationNodeOut(
+                equation_id=node.equation_id,
+                latex=node.latex,
+                equation_number=node.equation_number,
+                section=node.section,
+                provenance_kind=node.provenance_kind,
+                verification_status=node.verification_status,
+            )
+            for node in graph.nodes
+        ],
+        edges=[
+            EquationEdgeOut(
+                from_equation_id=edge.from_equation_id,
+                to_equation_id=edge.to_equation_id,
+                kind=edge.kind,
+                label=edge.label,
+                verification_status=edge.verification_status,
+                provenance_kind=edge.provenance_kind,
+            )
+            for edge in graph.edges
+        ],
+        isolated=graph.isolated,
     )

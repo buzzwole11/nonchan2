@@ -32,6 +32,7 @@ import { Chip } from '../../src/components/Chip';
 import { PressableRow } from '../../src/components/PressableRow';
 import { Text } from '../../src/components/Text';
 import { type MessageKey, translate } from '../../src/i18n';
+import { EquationGraphTab } from '../../src/math/EquationGraphTab';
 import { MathView } from '../../src/math/MathView';
 import {
   DETAIL_LEVELS,
@@ -47,7 +48,7 @@ import {
   stepBetween,
   visibleSteps,
 } from '../../src/math/focus';
-import { mathCardQuery } from '../../src/api/queries';
+import { equationGraphQuery, mathCardQuery } from '../../src/api/queries';
 import { ReportSheet, type ReportStatus } from '../../src/math/ReportSheet';
 import { useTheme } from '../../src/theme/ThemeProvider';
 
@@ -70,6 +71,9 @@ export default function FocusModeScreen() {
 
   const cardId = typeof id === 'string' ? id : '';
   const { data: card, isError: failed, refetch } = useQuery(mathCardQuery(api, cardId));
+  // The graph belongs to the paper, not the card: a card is a slice of a paper's equations,
+  // and the dependencies run between all of them.
+  const graph = useQuery(equationGraphQuery(api, card?.equations[0]?.paperId ?? null));
   const load = refetch;
 
   if (failed) {
@@ -175,6 +179,21 @@ export default function FocusModeScreen() {
           {tab === 'structure' && <StructureTab chain={view.equations} locale={locale} />}
           {tab === 'meaning' && <MeaningTab card={card} t={t} />}
           {tab === 'limits' && <LimitsTab steps={card.steps} t={t} />}
+
+          {/* Section 28's 数式知識グラフ, below the tabs rather than as a sixth one: section
+              10 names exactly five tabs, and this is about the paper's equations as a whole
+              rather than about this card. Built on the server from recorded definitions and
+              derivation steps — never from two equations resembling each other. */}
+          <View style={{ marginTop: theme.spacing.lg, gap: theme.spacing.sm }}>
+            <Text variant="label" accessibilityRole="header">
+              {t('graph.heading')}
+            </Text>
+            <EquationGraphTab
+              graph={graph.data}
+              loading={graph.isFetching && graph.data === undefined}
+              locale={locale}
+            />
+          </View>
 
           {/* Section 12 requires AI説明は数式的真偽を保証しないことを明示する. Saying the
               content might be wrong and then offering nowhere to disagree is half a

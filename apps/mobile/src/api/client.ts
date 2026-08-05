@@ -37,6 +37,7 @@ import type {
   MoveTileRequest,
   SavedListResponse,
   SavedPaperResponse,
+  EquationGraphResponse,
   PaperRelationsResponse,
   ReadingPathResponse,
   SearchResponse,
@@ -288,6 +289,11 @@ export class ApiClient {
    */
   readingPath(paperId: string): Promise<ReadingPathResponse> {
     return this.request<ReadingPathResponse>(`/papers/${paperId}/reading-path`);
+  }
+
+  /** How a paper's equations depend on each other (spec section 28, Phase 7). */
+  equationGraph(paperId: string): Promise<EquationGraphResponse> {
+    return this.request<EquationGraphResponse>(`/papers/${paperId}/equation-graph`);
   }
 
   // -- canvas (spec section 13) --------------------------------------------------

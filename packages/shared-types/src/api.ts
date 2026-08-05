@@ -288,6 +288,40 @@ export interface ReadingPathResponse {
   routes: ReadingRoute[];
 }
 
+/**
+ * The formula knowledge graph (spec section 28, Phase 7).
+ *
+ * Edges come only from recorded symbol definitions and derivation steps. Two equations that
+ * share a letter are not connected by that.
+ */
+export interface EquationNode {
+  equationId: Uuid;
+  latex: string;
+  equationNumber: string | null;
+  section: string | null;
+  provenanceKind: ProvenanceKind;
+  verificationStatus: VerificationStatus;
+}
+
+export interface EquationEdge {
+  fromEquationId: Uuid;
+  toEquationId: Uuid;
+  /** `defines`: a symbol used there was defined here. `derives`: a transformation step. */
+  kind: 'defines' | 'derives';
+  /** The symbol, for `defines`; the operation, for `derives`. */
+  label: string;
+  verificationStatus: VerificationStatus;
+  provenanceKind: ProvenanceKind;
+}
+
+export interface EquationGraphResponse {
+  paperId: Uuid;
+  nodes: EquationNode[];
+  edges: EquationEdge[];
+  /** Equations with no edge at all, so the client can say why they stand alone. */
+  isolated: Uuid[];
+}
+
 export interface SavedPaperResponse {
   savedPaper: SavedPaper;
   paper: Paper;

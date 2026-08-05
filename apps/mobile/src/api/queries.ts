@@ -45,6 +45,7 @@ export const queryKeys = {
   mathCard: (id: string) => ['math-card', id] as const,
   relations: (paperId: string) => ['relations', paperId] as const,
   readingPath: (paperId: string) => ['reading-path', paperId] as const,
+  equationGraph: (paperId: string) => ['equation-graph', paperId] as const,
 };
 
 export function createQueryClient(): QueryClient {
@@ -149,6 +150,15 @@ export function readingPathQuery(api: ApiClient, paperId: string | null) {
   return {
     queryKey: queryKeys.readingPath(paperId ?? ''),
     queryFn: () => api.readingPath(paperId as string),
+    enabled: paperId !== null,
+  };
+}
+
+/** How a paper's equations depend on each other (spec section 28, Phase 7). */
+export function equationGraphQuery(api: ApiClient, paperId: string | null) {
+  return {
+    queryKey: queryKeys.equationGraph(paperId ?? ''),
+    queryFn: () => api.equationGraph(paperId as string),
     enabled: paperId !== null,
   };
 }

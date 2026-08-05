@@ -740,6 +740,40 @@ class ReadingPathResponse(CamelModel):
     routes: list[ReadingRouteOut]
 
 
+class EquationNodeOut(CamelModel):
+    equation_id: uuid.UUID
+    latex: str
+    equation_number: str | None
+    section: str | None
+    provenance_kind: str
+    verification_status: str
+
+
+class EquationEdgeOut(CamelModel):
+    """One dependency between equations, and what recorded it.
+
+    `kind` is `defines` (a symbol used here was defined there) or `derives` (a transformation
+    step). Nothing is inferred from two equations resembling each other — an edge is a
+    mathematical claim, and sharing a letter is not evidence for one.
+    """
+
+    from_equation_id: uuid.UUID
+    to_equation_id: uuid.UUID
+    kind: str
+    #: The symbol, for `defines`; the operation, for `derives`.
+    label: str
+    verification_status: str
+    provenance_kind: str
+
+
+class EquationGraphResponse(CamelModel):
+    paper_id: uuid.UUID
+    nodes: list[EquationNodeOut]
+    edges: list[EquationEdgeOut]
+    #: Equations with no edge, named so the client can say why they stand alone.
+    isolated: list[uuid.UUID]
+
+
 class MoveTileRequest(CamelModel):
     x: float
     y: float
