@@ -1,0 +1,43 @@
+% Synthetic LaTeX for the citation-extraction tests (spec section 17). CC0-1.0.
+%
+% This document exists to be a paper that *refers to other papers*, which none of the other
+% fixtures do. It carries one of each kind of reference the extractor is allowed to match —
+% identifier, author-and-year, near-complete title — and several that it must refuse.
+\documentclass{article}
+\usepackage{amsmath}
+
+\title{Sharper Constants for Gaussian Integrals}
+\author{R. Almeida}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+
+% Refers by arXiv identifier: the strongest form the extractor recognises.
+The evaluation in arXiv:2601.00001 obtains the constant by a polar substitution, and we
+follow that route here.
+
+% Refers by surname and year together. Neither half alone may match.
+In contrast to Nonymous (2026), we do not require the parameter to be strictly positive,
+and the bound therefore extends to the degenerate case.
+
+% Refers by a nearly complete title, and the title is long enough to be distinctive.
+The paper Concentration for Non-Reversible Measures treats the multi-dimensional case.
+
+% A title too short to be distinctive. Must not match: "A Worked Gaussian Integral"
+% contributes three usable words, and any sentence about Gaussian integrals contains them.
+The paper A Worked Gaussian Integral treats only the one-dimensional case.
+
+\section{Discussion}
+
+% A year with no surname. Must not match anything.
+Earlier treatments from 2026 used a different normalisation.
+
+% A surname with no year. Must not match anything.
+The argument of Nonymous is standard.
+
+% A contrastive phrase in a sentence that refers to nobody. Must not attach to any paper.
+Unlike the usual presentation, we keep the constant explicit throughout.
+
+\end{document}

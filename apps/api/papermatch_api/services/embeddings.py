@@ -120,6 +120,16 @@ def nearest_papers(
     if len(vector) != ANN_DIMENSIONS:
         return []
 
+    # **The anchor is excluded in Python, not in SQL.** A selective `WHERE` alongside an
+    # `ORDER BY <-> LIMIT` is the pattern where an approximate index can return *fewer* rows
+    # than asked for — pgvector walks the graph, collects a fixed number of candidates, and
+    # only then applies the filter, so a filter that removes candidates removes results. CI
+    # caught exactly this: the query came back empty on a build whose pgvector plans the
+    # index scan, while passing locally where it did not.
+    #
+    # The remaining conditions are deliberately non-selective — every row in this table is a
+    # paper embedding from this model — so they cost nothing in candidates. Over-fetching by
+    # one covers the single row `exclude` removes.
     distance = Embedding.vector_ann.cosine_distance(vector).label("distance")
     rows = session.execute(
         select(Embedding.entity_id, distance)
@@ -128,9 +138,10 @@ def nearest_papers(
             Embedding.model == MODEL_NAME,
             Embedding.version == MODEL_VERSION,
             Embedding.vector_ann.is_not(None),
-            *([Embedding.entity_id != exclude] if exclude is not None else []),
         )
         .order_by(distance)
-        .limit(limit)
+        .limit(limit + 1 if exclude is not None else limit)
     ).all()
-    return [(entity_id, 1.0 - float(dist)) for entity_id, dist in rows]
+    return [(entity_id, 1.0 - float(dist)) for entity_id, dist in rows if entity_id != exclude][
+        :limit
+    ]

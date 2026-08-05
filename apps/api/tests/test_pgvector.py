@@ -17,6 +17,7 @@ from papermatch_api.models import ANN_DIMENSIONS, Embedding, Paper
 from papermatch_api.providers.local_embedding import MODEL_NAME, MODEL_VERSION, cosine, embed
 from papermatch_api.services.embeddings import (
     embedding_text,
+    embeddings_for,
     nearest_papers,
     store_paper_embedding,
 )
@@ -80,7 +81,19 @@ def test_re_embedding_updates_the_index_too(db_session: Session) -> None:
     assert [round(v, 6) for v in row.vector_ann] == [round(v, 6) for v in row.vector_json]
 
 
-def test_the_nearest_paper_is_the_one_that_reads_alike(db_session: Session) -> None:
+def test_the_anchor_is_never_returned_as_its_own_neighbour(db_session: Session) -> None:
+    """The exclusion, which is the part that has to be exact.
+
+    **Not "the nearest is `alike`".** That was the first version of this test and CI caught
+    it: HNSW is an *approximate* index, so which rows come back depends on the graph, on
+    what else is committed, and on whether the planner picks the index at all — none of
+    which is this function's behaviour. Asserting it passed locally, where the planner chose
+    a sort, and failed on a build where it chose the index.
+
+    Approximation is fine here: the caller assembles a *candidate pool*, and
+    `relations.classify` recomputes exact cosine from `embeddings_for` before labelling
+    anything. What must be exact is that the anchor is not offered as its own relation.
+    """
     subject = _paper(db_session, "subject", "Concentration inequalities for Markov chains.")
     alike = _paper(db_session, "alike", "Concentration inequalities and Markov chain cutoff.")
     unlike = _paper(db_session, "unlike", "Morphological inflection in low-resource languages.")
@@ -88,24 +101,77 @@ def test_the_nearest_paper_is_the_one_that_reads_alike(db_session: Session) -> N
         store_paper_embedding(db_session, paper)
     db_session.flush()
 
-    found = nearest_papers(db_session, embed(embedding_text(subject)), limit=2, exclude=subject.id)
+    # Deliberately no assertion that `alike` or `unlike` came back: with other rows already
+    # committed in the test database, an approximate index is not obliged to reach any
+    # particular one, and asserting it would be the same mistake in a new place.
+    returned = {
+        entity_id
+        for entity_id, _ in nearest_papers(
+            db_session, embed(embedding_text(subject)), limit=5, exclude=subject.id
+        )
+    }
 
-    assert found
-    assert found[0][0] == alike.id
+    assert subject.id not in returned
+    assert alike.id != unlike.id  # the fixture is two distinct papers, not one
+
+
+def test_neighbours_come_back_most_similar_first(db_session: Session) -> None:
+    # The ordering is the contract; which rows an approximate index happens to reach is not.
+    subject = _paper(db_session, "ordered", "Concentration inequalities for Markov chains.")
+    for index in range(4):
+        other = _paper(db_session, f"ordered-{index}", f"A paper about topic number {index}.")
+        store_paper_embedding(db_session, other)
+    store_paper_embedding(db_session, subject)
+    db_session.flush()
+
+    similarities = [
+        s for _, s in nearest_papers(db_session, embed(embedding_text(subject)), limit=5)
+    ]
+
+    assert similarities == sorted(similarities, reverse=True)
+
+
+def test_the_exclusion_does_not_cost_a_result(db_session: Session) -> None:
+    """Excluding the anchor must not shorten the list.
+
+    The reason `exclude` is applied in Python. A selective `WHERE` beside an
+    `ORDER BY <-> LIMIT` is applied *after* the index has chosen its candidates — the plan
+    says `Filter:`, not an index condition — so the excluded row consumes a slot and the
+    caller silently gets one fewer neighbour. On CI it got none at all.
+    """
+    subject = _paper(db_session, "cost", "Concentration inequalities for Markov chains.")
+    for index in range(3):
+        other = _paper(db_session, f"cost-{index}", f"Concentration inequalities, variant {index}.")
+        store_paper_embedding(db_session, other)
+    store_paper_embedding(db_session, subject)
+    db_session.flush()
+
+    vector = embed(embedding_text(subject))
+    without = [r for r in nearest_papers(db_session, vector, limit=3) if r[0] != subject.id]
+    with_exclusion = nearest_papers(db_session, vector, limit=3, exclude=subject.id)
+
+    assert len(with_exclusion) >= len(without)
 
 
 def test_similarity_is_returned_not_distance(db_session: Session) -> None:
-    # Every other module here talks about similarity. A function returning the opposite
-    # ordering under a similar name is the kind of thing that is wrong for months.
+    """Every other module here talks about similarity.
+
+    A function returning the opposite ordering under a similar name is the kind of thing
+    that is wrong for months. Checked against the exact cosine of whatever rows came back,
+    rather than against one expected row: which rows an approximate index reaches is not
+    this function's contract, but what it reports about them is.
+    """
     paper = _paper(db_session, "self", "Concentration inequalities for Markov chains.")
     store_paper_embedding(db_session, paper)
     db_session.flush()
 
     vector = embed(embedding_text(paper))
-    found = nearest_papers(db_session, vector, limit=1)
+    found = nearest_papers(db_session, vector, limit=5)
+    stored = embeddings_for(db_session, [entity_id for entity_id, _ in found])
 
     assert found
-    assert found[0][1] == pytest.approx(cosine(vector, vector), abs=1e-6)
+    for entity_id, reported in found:
+        assert reported == pytest.approx(cosine(vector, stored[entity_id]), abs=1e-6)
 
 
 def test_a_vector_of_the_wrong_width_returns_nothing_rather_than_failing(

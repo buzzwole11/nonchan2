@@ -148,8 +148,12 @@ def strip_comments(source: str) -> str:
     return _COMMENT_RE.sub("", source)
 
 
-def _body_of(source: str) -> str:
-    """The document body, or the whole string when there is no `\\begin{document}`."""
+def body_of(source: str) -> str:
+    """The document body, or the whole string when there is no `\\begin{document}`.
+
+    Public because `text/citations.py` needs it too: a preamble is declarations rather than
+    prose, and its `\\author` is the citing paper's own name.
+    """
     start = _BEGIN_DOC_RE.search(source)
     if start is None:
         return source
@@ -243,7 +247,7 @@ def _symbols_from(text: str, equation_index: int) -> list[SymbolMention]:
 
 def parse_document(source: str) -> LatexDocument:
     """Read a LaTeX manuscript into equations, context and symbols."""
-    body = _body_of(strip_comments(source))
+    body = body_of(strip_comments(source))
     statements = _statement_spans(body)
 
     matches: list[tuple[int, int, str, str]] = []
