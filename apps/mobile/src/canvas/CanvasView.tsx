@@ -25,9 +25,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { CanvasTile } from '@papermatch/shared-types';
 
-import { canvasQuery, queryKeys } from '../api/queries';
+import { canvasQuery, queryKeys, relationsQuery } from '../api/queries';
 import { useSession } from '../api/session';
 import { CanvasPlane, fieldsOnPlane } from './CanvasPlane';
+import { RelationList } from './RelationList';
 import { Chip } from '../components/Chip';
 import { PressableRow } from '../components/PressableRow';
 import { Text } from '../components/Text';
@@ -71,6 +72,10 @@ export function CanvasView({ selectedId, onSelectedChange }: CanvasViewProps) {
   );
   const fields = useMemo(() => fieldsOnPlane(allTiles), [allTiles]);
   const selected = tiles.find((tile) => tile.entityId === selectedId) ?? null;
+  // Fetched per selection rather than for the whole plane: the server classifies against the
+  // reader's library each time, and doing that for every tile would be a request per tile
+  // for panels that are never opened.
+  const relations = useQuery(relationsQuery(api, selected?.paper.id ?? null));
 
   const planeHeight = Math.max(280, Math.round(width * 0.95));
   const scale = ZOOM_STEPS[zoomIndex] ?? 1;
@@ -255,6 +260,15 @@ export function CanvasView({ selectedId, onSelectedChange }: CanvasViewProps) {
               </Text>
             </PressableRow>
           </View>
+          {/* Section 13: 基礎、対立、後続、類似を方向別に表示. The panel already names the
+              paper; this says what it sits next to, and on what evidence. */}
+          <RelationList
+            relations={relations.data?.relations ?? []}
+            locale={locale}
+            loading={relations.isFetching && relations.data === undefined}
+            onSelect={onSelectedChange}
+          />
+
           {/* Placing a tile by hand without a drag gesture (section 20), and the reason
               these are buttons rather than only a drag: a drag is the one interaction a
               switch or keyboard user cannot perform at all. Each press nudges by one grid

@@ -11,6 +11,8 @@ import type {
   Interest,
   Iso8601,
   Paper,
+  RelationBasis,
+  RelationEvidence,
   SavedPaper,
   Translation,
   User,
@@ -23,6 +25,7 @@ import type {
   MathCardType,
   MathLevel,
   ProvenanceKind,
+  RelationType,
   ReportReason,
   ReviewOutcome,
   SaveReason,
@@ -208,6 +211,29 @@ export interface SearchResponse {
    * query, which means "searched, found nothing" — the two need different screens.
    */
   emptyQuery: boolean;
+}
+
+/**
+ * One relation around a paper, with what produced it (spec section 17).
+ *
+ * `basis` is duplicated out of `evidence` because it is what the UI renders — the reader is
+ * told "cited in the references" or "the paper says so", never a bare confidence number.
+ */
+export interface PaperRelationHit {
+  relationType: RelationType;
+  confidence: number;
+  basis: RelationBasis;
+  evidence: RelationEvidence;
+  paper: Paper;
+}
+
+export interface PaperRelationsResponse {
+  paperId: Uuid;
+  /**
+   * Empty when the evidence supports nothing. That is a real answer and the client says so:
+   * falling back to "papers that look similar" is the one thing section 17 forbids.
+   */
+  relations: PaperRelationHit[];
 }
 
 export interface SavedPaperResponse {

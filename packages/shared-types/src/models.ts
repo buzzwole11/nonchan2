@@ -289,19 +289,48 @@ export interface MathCard {
   provenanceKind: ProvenanceKind;
 }
 
+/**
+ * Which kind of evidence produced a relation label (spec section 17).
+ *
+ * Named rather than implied by the confidence number, because the three are not points on
+ * one scale: a citation is a fact about a reference list, a mention is a sentence someone
+ * wrote, and a similarity is a model's opinion. The UI says which.
+ */
+export const RELATION_BASES = ['citation', 'mention', 'similarity'] as const;
+
+export type RelationBasis = (typeof RELATION_BASES)[number];
+
+/**
+ * What the classifier had to go on (spec section 17: 引用方向、公開日、本文中の言及、
+ * モデル分類の根拠を保持する).
+ *
+ * Every field is optional-or-null on purpose. `similarity: null` means the two papers were
+ * never compared — a paper ingested before the embedder existed is not thereby unlike
+ * everything — and writing `0` there instead would turn "not measured" into a measurement.
+ */
+export interface RelationEvidence {
+  basis: RelationBasis;
+  /** Which way the citation runs, when a reference list said so at all. */
+  citation?: 'anchor_cites_candidate' | 'candidate_cites_anchor' | 'mutual';
+  publicationOrder: 'before' | 'after' | 'same_year' | null;
+  anchorYear: number | null;
+  candidateYear: number | null;
+  /** Null when the dates could not corroborate or contradict the citation. */
+  publicationOrderAgrees?: boolean | null;
+  /** The sentence itself, so a reader can check the claim rather than trust it. */
+  mention?: { source: string; snippet: string };
+  contrastCue?: string;
+  similarity: number | null;
+  similarityModel: string | null;
+}
+
 export interface PaperRelation {
   sourcePaperId: Uuid;
   targetPaperId: Uuid;
   relationType: RelationType;
   confidence: number;
   /** Section 17: never assert a relation from similarity alone. */
-  evidence: {
-    citationDirection?: 'cites' | 'cited_by' | 'none';
-    publicationOrder?: 'before' | 'after' | 'same';
-    mentionSnippet?: string | null;
-    similarity?: number;
-    model?: string | null;
-  };
+  evidence: RelationEvidence;
 }
 
 export interface Embedding {

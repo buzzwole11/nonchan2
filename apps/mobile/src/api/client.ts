@@ -37,6 +37,7 @@ import type {
   MoveTileRequest,
   SavedListResponse,
   SavedPaperResponse,
+  PaperRelationsResponse,
   SearchResponse,
   UndoResponse,
   UpdateSavedRequest,
@@ -266,6 +267,16 @@ export class ApiClient {
    */
   searchSaved(query: string, limit = 30): Promise<SearchResponse> {
     return this.request<SearchResponse>('/search', { query: { q: query, limit } });
+  }
+
+  /**
+   * How a paper sits among the reader's library (spec section 17).
+   *
+   * Authenticated, and deliberately so: the candidates start from the reader's own saved
+   * papers, so two readers looking at the same paper see relations to *their* libraries.
+   */
+  paperRelations(paperId: string): Promise<PaperRelationsResponse> {
+    return this.request<PaperRelationsResponse>(`/papers/${paperId}/relations`);
   }
 
   // -- canvas (spec section 13) --------------------------------------------------

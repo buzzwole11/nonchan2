@@ -284,6 +284,19 @@ export const messages = {
     'canvas.moveLeft': '左へ',
     'canvas.moveRight': '右へ',
 
+    'relations.heading': 'この論文のまわり',
+    'relations.none': '関係のある論文は見つかりませんでした',
+    'relations.noneHint':
+      '引用・言及・内容の近さのいずれにも根拠がありません。似ているだけの論文はここに出しません。',
+    'relations.quoted': '「{snippet}」',
+    'relation.foundational': '基礎になっている研究',
+    'relation.follow_up': '後続の研究',
+    'relation.contrasting': '対立する研究',
+    'relation.related': '関連する研究',
+    'relationBasis.citation': '引用による',
+    'relationBasis.mention': '本文の言及による',
+    'relationBasis.similarity': '内容が近い',
+
     'share.open': '画像にする',
     'share.heading': '共有する画像',
     'share.title': 'タイトル',
@@ -654,6 +667,19 @@ export const messages = {
     'canvas.moveDown': 'Down',
     'canvas.moveLeft': 'Left',
     'canvas.moveRight': 'Right',
+
+    'relations.heading': 'Around this paper',
+    'relations.none': 'No related papers found',
+    'relations.noneHint':
+      'Nothing here is supported by a citation, a mention, or closeness of content. Papers that merely look similar are not listed.',
+    'relations.quoted': '“{snippet}”',
+    'relation.foundational': 'Foundational work',
+    'relation.follow_up': 'Follow-up work',
+    'relation.contrasting': 'Contrasting work',
+    'relation.related': 'Related work',
+    'relationBasis.citation': 'From the references',
+    'relationBasis.mention': 'From a mention in the text',
+    'relationBasis.similarity': 'Similar content',
 
     'share.open': 'Make an image',
     'share.heading': 'Image to share',

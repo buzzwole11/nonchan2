@@ -683,6 +683,29 @@ class CanvasResponse(CamelModel):
     layout_version: str
 
 
+class PaperRelationOut(CamelModel):
+    """One relation, with the evidence that produced it (spec section 17).
+
+    `evidence` is not debug output. Section 17 requires citation direction, publication
+    order, the mention and the model to be kept, and the client shows them: a reader told
+    that one paper is foundational to another is entitled to see on what basis. `basis`
+    names which rule fired, so the UI can say "cited in the references" rather than printing
+    a confidence number at someone.
+    """
+
+    relation_type: str
+    confidence: float
+    #: Which kind of evidence produced the label: `citation`, `mention` or `similarity`.
+    basis: str
+    evidence: dict[str, Any]
+    paper: PaperOut
+
+
+class PaperRelationsResponse(CamelModel):
+    paper_id: uuid.UUID
+    relations: list[PaperRelationOut]
+
+
 class MoveTileRequest(CamelModel):
     x: float
     y: float

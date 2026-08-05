@@ -21,8 +21,12 @@ from papermatch_api.schemas import (
     PaperIdentifierOut,
     PaperListResponse,
     PaperOut,
+    PaperRelationOut,
+    PaperRelationsResponse,
     SourceProvenanceOut,
 )
+from papermatch_api.security import CurrentUser
+from papermatch_api.services.relations import relations_for
 
 router = APIRouter(tags=["papers"])
 
@@ -126,3 +130,48 @@ def get_paper(paper_id: uuid.UUID, db: Annotated[Session, Depends(get_db)]) -> P
         db.execute(select(AbstractSegment).where(AbstractSegment.paper_id == paper.id)).scalars()
     )
     return serialize_paper(paper, segments)
+
+
+@router.get("/papers/{paper_id}/relations", response_model=PaperRelationsResponse)
+def get_paper_relations(
+    paper_id: uuid.UUID,
+    user: CurrentUser,
+    db: Annotated[Session, Depends(get_db)],
+) -> PaperRelationsResponse:
+    """How this paper sits among the reader's library (spec section 17).
+
+    Authenticated because the candidate pool starts from the reader's own saved papers —
+    section 17 is about organising 保存論文の周辺, and two readers looking at the same paper
+    should see relations to *their* libraries.
+
+    Returns only relations the evidence supports. An empty list is a real answer and the
+    client says so plainly; it is not an error and not an invitation to fall back to
+    "papers that look similar", which is the one thing section 17 forbids.
+    """
+    anchor = db.execute(
+        select(Paper)
+        .options(
+            selectinload(Paper.identifiers),
+            selectinload(Paper.field_weights),
+        )
+        .where(Paper.id == paper_id)
+    ).scalar_one_or_none()
+    if anchor is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="paper_not_found")
+
+    pairs = relations_for(db, anchor, user.id)
+    db.commit()
+
+    return PaperRelationsResponse(
+        paper_id=anchor.id,
+        relations=[
+            PaperRelationOut(
+                relation_type=row.relation_type,
+                confidence=row.confidence,
+                basis=str(row.evidence.get("basis", "similarity")),
+                evidence=row.evidence,
+                paper=serialize_paper(target),
+            )
+            for target, row in pairs
+        ],
+    )

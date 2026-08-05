@@ -43,6 +43,7 @@ export const queryKeys = {
   review: () => ['review'] as const,
   mathCards: () => ['math-cards'] as const,
   mathCard: (id: string) => ['math-card', id] as const,
+  relations: (paperId: string) => ['relations', paperId] as const,
 };
 
 export function createQueryClient(): QueryClient {
@@ -120,6 +121,20 @@ export function canvasQuery(api: ApiClient) {
   return {
     queryKey: queryKeys.canvas(),
     queryFn: () => api.canvas(),
+  };
+}
+
+/**
+ * How the selected paper sits among the reader's library (spec section 17).
+ *
+ * `enabled` on a selection: with nothing selected there is no anchor, and asking the server
+ * for the relations of nothing is a request that can only be answered with an error.
+ */
+export function relationsQuery(api: ApiClient, paperId: string | null) {
+  return {
+    queryKey: queryKeys.relations(paperId ?? ''),
+    queryFn: () => api.paperRelations(paperId as string),
+    enabled: paperId !== null,
   };
 }
 
