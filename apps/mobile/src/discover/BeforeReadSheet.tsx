@@ -22,7 +22,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { ExplanationItem, ExplanationSection } from '@papermatch/shared-types';
 
 import { explanationQuery } from '../api/queries';
-import { useApiClient } from '../api/useApi';
+import type { ApiClient } from '../api/client';
 import { PressableRow } from '../components/PressableRow';
 import { Text } from '../components/Text';
 import { type MessageKey, translate } from '../i18n';
@@ -35,14 +35,22 @@ export interface BeforeReadSheetProps {
   paperTitle: string | null;
   onClose: () => void;
   /**
+   * The session's client — the one whose requests carry the reader's token.
+   *
+   * A prop, not a hook, and that is a bug being kept out rather than a style choice: this
+   * sheet used to call `useApiClient()`, a Phase-0 leftover whose token accessor nothing
+   * had written to since D-007 moved auth into the session. Every request it made was
+   * unauthenticated, every response was 401, and the sheet said 「読み込めませんでした」
+   * for a feature that worked — visible only in a browser, because the unit tests mocked
+   * the very hook that was broken.
+   */
+  api: ApiClient;
+  /**
    * False while the stored token is still being read back at start-up.
    *
    * Passed in rather than read from the session here: this sheet is presentational, and a
    * component that reaches for the session is one its tests have to stand a whole provider
    * up for. `saved.tsx` gates its queries the same way, for the same reason.
-   *
-   * Defaults to true so a caller that has no session concept (the visual harness) renders
-   * normally.
    */
   ready?: boolean;
 }
@@ -53,6 +61,7 @@ export function BeforeReadSheet({
   paperId,
   paperTitle,
   onClose,
+  api,
   ready = true,
 }: BeforeReadSheetProps) {
   const theme = useTheme();
@@ -90,7 +99,7 @@ export function BeforeReadSheet({
 
           {/* Content only mounts while the sheet is open, so nothing is fetched for cards
               that merely scroll past (spec sections 8, 25). */}
-          {visible && <SheetBody locale={locale} paperId={paperId} ready={ready} />}
+          {visible && <SheetBody locale={locale} paperId={paperId} api={api} ready={ready} />}
 
           <PressableRow onPress={onClose} accessibilityLabel={t('explain.close')}>
             <Text>{t('explain.close')}</Text>
@@ -104,13 +113,14 @@ export function BeforeReadSheet({
 function SheetBody({
   locale,
   paperId,
+  api,
   ready,
 }: {
   locale: 'ja' | 'en';
   paperId: string | null;
+  api: ApiClient;
   ready: boolean;
 }) {
-  const api = useApiClient();
   const t = (key: MessageKey) => translate(locale, key);
   const query = useQuery(explanationQuery(api, paperId, ready));
 

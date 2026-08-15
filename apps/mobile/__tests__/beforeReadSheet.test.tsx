@@ -9,14 +9,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react-native';
 import type { PaperExplanationResponse } from '@papermatch/shared-types';
 
+import type { ApiClient } from '../src/api/client';
+
 import { BeforeReadSheet } from '../src/discover/BeforeReadSheet';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
 
 const mockPaperExplanation = jest.fn<Promise<PaperExplanationResponse>, [string]>();
-
-jest.mock('../src/api/useApi', () => ({
-  useApiClient: () => ({ paperExplanation: mockPaperExplanation }),
-}));
 
 // `explanationQuery` lives in queries.ts, which also carries the offline-cache queries and
 // through them AsyncStorage — a native module Jest does not have. The cache is not under
@@ -98,6 +96,11 @@ function renderSheet() {
           paperId="p1"
           paperTitle="Concentration for Non-Reversible Measures"
           onClose={jest.fn()}
+          // The client is a prop, so the test injects a stub instead of mocking a module.
+          // The hook this used to mock (`useApiClient`) was a dead Phase-0 path whose
+          // requests were always unauthenticated — and mocking it is exactly why these
+          // tests stayed green while the real sheet 401ed on every open.
+          api={{ paperExplanation: mockPaperExplanation } as unknown as ApiClient}
         />
       </ThemeProvider>
     </QueryClientProvider>,
@@ -193,6 +196,7 @@ describe('BeforeReadSheet', () => {
             paperId="p1"
             paperTitle={null}
             onClose={jest.fn()}
+            api={{ paperExplanation: mockPaperExplanation } as unknown as ApiClient}
           />
         </ThemeProvider>
       </QueryClientProvider>,

@@ -1,7 +1,4 @@
 import Constants from 'expo-constants';
-import { useMemo } from 'react';
-
-import { ApiClient } from './client';
 
 /** Base URL from `app.json` → `expo.extra.apiBaseUrl`, overridable per environment. */
 export function apiBaseUrl(): string {
@@ -11,17 +8,8 @@ export function apiBaseUrl(): string {
     : 'http://localhost:8000';
 }
 
-let inMemoryToken: string | null = null;
-
-/**
- * Phase 0 keeps the guest token in memory only. Phase 1 moves it into
- * `expo-secure-store`; the accessor shape does not change (spec section 25: keys and
- * tokens are never written somewhere the client cannot protect).
- */
-export function setAuthToken(token: string | null): void {
-  inMemoryToken = token;
-}
-
-export function useApiClient(): ApiClient {
-  return useMemo(() => new ApiClient({ baseUrl: apiBaseUrl(), getToken: () => inMemoryToken }), []);
-}
+// `useApiClient` and `setAuthToken` used to live here — Phase 0's in-memory token, kept
+// "so the accessor shape would not change" when D-007 moved auth into the session. Nothing
+// ever called `setAuthToken` again, so the hook handed out a client that could only make
+// unauthenticated requests, and the one component still using it showed its failure state
+// on every open. A dead path that looks like a live one is worse than no path: deleted.

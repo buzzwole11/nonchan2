@@ -11,8 +11,10 @@
  * reach the parent. The height message therefore arrives by `postMessage` rather than by
  * reading the frame's document, which the sandbox forbids.
  */
-import { createElement, useEffect, useMemo, useRef } from 'react';
+import { createElement, useEffect, useRef } from 'react';
 import { View } from 'react-native';
+
+import { useDocumentUrl } from './useDocumentUrl.web';
 
 export interface MathFrameProps {
   html: string;
@@ -22,9 +24,10 @@ export interface MathFrameProps {
 
 export function MathFrame({ html, height, onMessage }: MathFrameProps) {
   const frame = useRef<HTMLIFrameElement | null>(null);
-  const url = useMemo(() => URL.createObjectURL(new Blob([html], { type: 'text/html' })), [html]);
-
-  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  // Revocation is deferred until a successor loads — see `useDocumentUrl` for the
+  // freeze/re-attach race this avoids. A formula document is rebuilt on every theme or
+  // font-size change, so this frame runs the same risk as the abstract's.
+  const { url, onFrameLoad } = useDocumentUrl(html);
 
   useEffect(() => {
     const listener = (event: MessageEvent) => {
@@ -43,7 +46,9 @@ export function MathFrame({ html, height, onMessage }: MathFrameProps) {
     <View style={{ height }} pointerEvents="box-none">
       {createElement('iframe', {
         ref: frame,
+        key: url,
         src: url,
+        onLoad: onFrameLoad,
         title: '',
         sandbox: 'allow-scripts',
         style: {

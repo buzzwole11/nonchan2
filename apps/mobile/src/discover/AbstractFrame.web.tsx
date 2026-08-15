@@ -14,10 +14,11 @@
  * is why the selection is sent as a message rather than by calling a function on the
  * frame's window.
  */
-import { createElement, useEffect, useMemo, useRef } from 'react';
+import { createElement, useEffect, useRef } from 'react';
 import { type StyleProp, View, type ViewStyle } from 'react-native';
 
 import { selectionMessage } from '../math/abstractDocument';
+import { useDocumentUrl } from '../math/useDocumentUrl.web';
 
 export interface AbstractFrameProps {
   html: string;
@@ -29,9 +30,7 @@ export interface AbstractFrameProps {
 
 export function AbstractFrame({ html, height, selected, onMessage, style }: AbstractFrameProps) {
   const frame = useRef<HTMLIFrameElement | null>(null);
-  const url = useMemo(() => URL.createObjectURL(new Blob([html], { type: 'text/html' })), [html]);
-
-  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  const { url, onFrameLoad } = useDocumentUrl(html);
 
   useEffect(() => {
     const listener = (event: MessageEvent) => {
@@ -54,7 +53,11 @@ export function AbstractFrame({ html, height, selected, onMessage, style }: Abst
     <View style={[{ height }, style]}>
       {createElement('iframe', {
         ref: frame,
+        // Keyed on the URL: a new document gets a new element, so its load can never be
+        // coalesced away by a navigation the old element had in flight.
+        key: url,
         src: url,
+        onLoad: onFrameLoad,
         title: '',
         sandbox: 'allow-scripts',
         style: { width: '100%', height, border: 0, background: 'transparent', display: 'block' },
