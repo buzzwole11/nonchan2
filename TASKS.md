@@ -56,13 +56,17 @@
 - [x] Provider ごとのサーキットブレーカーとレート制限（仕様書 25 節）— `providers/http.py`。
       429 / 5xx はブレーカーを開き、それ以外の 4xx は開かない（自分側のクエリ不備で Provider を落とさない）
 - [x] ライセンスの立場を明文化し、レコードに根拠 URL を同梱（DECISIONS.md D-025）
-- [ ] **実 API への疎通確認**（`-m live`。この環境では実行不可）
+- [ ] **実 API への疎通確認** — `cli live-check` に一本化済み。egress を許可した**後で
+      開いたセッション**から実行する（許可はコンテナ起動時に読まれる）。この環境では
+      proxy が `Host not in allowlist` を返す段階で止まることまで確認済み
 - [x] **取り込み worker**（`services/worker.py`、`cli.py worker` / `cli.py runs`）—
       discovery（新着を追う・cursor を永続化）と refresh（撤回・版更新を取り込み直す）の 2 種類。
       再取得キューは `last_refreshed_at` で並べる（DECISIONS.md D-034）。
       provider が返さない論文を撤回扱いにしない、失敗した run の cursor を継がない、
       1 つの job の失敗が他を止めない、をテストで固定
-- [ ] 実データ 100 件以上でフィードが構成できることの確認（仕様書 29 節）— worker と疎通が前提
+- [ ] 実データ 100 件以上でフィードが構成できることの確認（仕様書 29 節）—
+      `cli live-check` の最終段階。取り込みまで通れば自動で判定し、100 件に届かない
+      場合は「届いていない」と明示する（黙って 40 件でフィードを作らない）
 
 ### 1-B フィード API ✅
 - [x] `GET /feed?mode=discover&cursor=` — 70/20/10 の枠配分、表示履歴による除外、推薦理由の付与

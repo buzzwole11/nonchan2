@@ -63,12 +63,30 @@ curl -s "localhost:8000/math-cards/$ID?includeUnverified=true" | jq '.hiddenStep
 
 | # | 操作 | それで動くもの |
 | --- | --- | --- |
-| 1 | **egress の許可**: Claude Code の環境設定（ネットワークポリシー）で `export.arxiv.org` と `api.openalex.org` を許可する | 実データの取り込み（`PAPERMATCH_PAPER_PROVIDER=arxiv` + worker）、疎通テスト `pytest -m live`、実データ 100 件でのフィード確認、英語難易度の較正 |
+| 1 | **egress の許可**: Claude Code の設定 → 機能 → 追加の許可ドメインに `export.arxiv.org` と `api.openalex.org` を追加し、**その後で新しいセッションを開く**（許可はコンテナ起動時に読まれるため、既存セッションには反映されません） | 実データの取り込み、疎通、100 件でのフィード構成。まとめて `cli live-check` 1 コマンドで確認できます（下記） |
 | 2 | **API 鍵**: 環境変数 `PAPERMATCH_ANTHROPIC_API_KEY` を設定し、`PAPERMATCH_TRANSLATION_PROVIDER=anthropic` `PAPERMATCH_EXPLANATION_PROVIDER=anthropic` にする | 実翻訳（6 段階すべて）、Before you read の生成部分、Why it matters の 4 種。鍵はサーバ側だけに置く（仕様書 25 節） |
 | 3 | **実機**: 手元のマシンで `npm install && npm run mobile`、Expo Go で開く | TASKS.md の実機チェックリスト（文タップ選択、WebView の数式、VoiceOver、Dynamic Type、機内モード）と Maestro E2E |
 | 4 | **push 配信**（任意）: APNs / FCM などの配信チャネルを接続する | 通知が受信箱に加えて端末にも届く。プリセット・静音時間・1日1回は生成時に適用済みなので、チャネル側の判断は不要（`notifications` テーブルの行を送るだけ） |
 
 この環境の egress 拒否は組織ポリシーの 403 で、回避はしません（proxy の指示どおり報告のみ）。1 と 2 は [claude.ai/code](https://claude.ai/code) の環境設定から変更できます。
+
+### 実データでの確認は 1 コマンド
+
+egress が通ったら、疎通・応答形状・取り込み・フィード構成を順に確かめます。どの段階で止まったかを名指しするので、「フィードが空」の原因を推測せずに済みます。
+
+```bash
+cd apps/api && ./.venv/bin/python -m papermatch_api.cli live-check
+```
+
+```
+✓ 分野タクソノミー
+    15 分野
+✗ arxiv: 疎通  (0.1s)
+    到達できません（Host not in allowlist: export.arxiv.org）。egress の許可と、
+    このセッションが許可の後に起動されたかを確認してください
+```
+
+成功した段階は ✓、最初に失敗した段階が ✗ です。全段階が通ると終了コード 0、どこかで止まると 1 を返すので、デプロイの前段に置けます。仕様書 29 節の「実データ 100 件以上でフィードが構成できる」はこのコマンドの最後の段階です。
 
 ## 実データ Provider（arXiv / OpenAlex）
 

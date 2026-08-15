@@ -19,6 +19,7 @@ from papermatch_api.providers.base import PaperQuery
 from papermatch_api.providers.registry import get_fulltext_provider, get_paper_provider
 from papermatch_api.services.fulltext import load_full_texts
 from papermatch_api.services.ingestion import ingest, load_fields
+from papermatch_api.services.live_check import run_live_check
 from papermatch_api.services.math_content import load_math_cards
 from papermatch_api.services.metrics import collect
 from papermatch_api.services.notification_inbox import generate_for_all
@@ -101,6 +102,32 @@ def worker(once: bool, interval_seconds: int) -> int:
         time.sleep(interval_seconds)
 
 
+def live_check(sources: list[str]) -> int:
+    """Prove the app works on real data (spec sections 1-A, 29).
+
+    Needs outbound access to the paper APIs. Returns non-zero when any step fails, so it
+    can gate a deployment rather than only informing one.
+    """
+    from papermatch_api.providers.registry import PAPER_PROVIDERS, _resolve
+
+    settings = get_settings()
+    providers = {
+        name: _resolve(PAPER_PROVIDERS, name, settings, "paper")
+        for name in sources
+        if name != "mock"
+    }
+    if not providers:
+        print("実データ Provider が指定されていません（--sources arxiv openalex）。")
+        return 2
+
+    with session_scope() as session:
+        report = run_live_check(session, providers)
+        rendered = report.render()
+        ok = report.ok
+    print(rendered)
+    return 0 if ok else 1
+
+
 def runs(limit: int) -> int:
     """Print the recent run log — what an operator reads to answer "is it working?"."""
     with session_scope() as session:
@@ -167,6 +194,13 @@ def main(argv: list[str] | None = None) -> int:
     review_parser = sub.add_parser("review", help="the human review queue (spec section 12)")
     review_parser.add_argument("--limit", type=int, default=20)
 
+    live_parser = sub.add_parser(
+        "live-check", help="reach the real paper APIs, ingest, and build a feed (section 29)"
+    )
+    live_parser.add_argument(
+        "--sources", nargs="+", default=["arxiv", "openalex"], help="which providers to test"
+    )
+
     args = parser.parse_args(argv)
     if args.command == "seed":
         return seed(args.limit)
@@ -176,6 +210,8 @@ def main(argv: list[str] | None = None) -> int:
         return runs(args.limit)
     if args.command == "metrics":
         return metrics(args.window)
+    if args.command == "live-check":
+        return live_check(args.sources)
     if args.command == "review":
         return review(args.limit)
     parser.error(f"unknown command {args.command}")
