@@ -138,7 +138,9 @@ Markdown と手で整えた JSON は Prettier の対象外です（`.prettierign
 
 ### まだ無いもの
 
-実 API への疎通確認（上記 `-m live`、この環境では実行不可 — [`DECISIONS.md`](./DECISIONS.md) D-016）、実翻訳 Provider と AI 説明（同じくネットワーク制約 — D-024）、Maestro による E2E、Knowledge Canvas。着手順は [`TASKS.md`](./TASKS.md) にあります。
+コードとしては全機能が入っています。残るのは開発環境の外でしか行えない操作だけで、上の「完成までに残っている操作」にまとめました — 論文 API への疎通（egress 許可が要る）、実機確認と Maestro E2E、push の配信チャネル、そして実データでの英語難易度較正（疎通が前提）。
+
+実翻訳と AI 説明の Provider は**実装済み**です（`PAPERMATCH_ANTHROPIC_API_KEY` を置いて `*_PROVIDER=anthropic` にすれば動きます）。鍵が無いときの既定は、翻訳が `mock`、説明が `derived`（論文から導ける事実だけを返し、導けないものは理由を添えて返さない）です。着手順は [`TASKS.md`](./TASKS.md) にあります。
 
 ---
 
