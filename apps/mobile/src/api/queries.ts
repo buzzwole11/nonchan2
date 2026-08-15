@@ -37,6 +37,7 @@ export interface Offlineable<T> {
 
 export const queryKeys = {
   explanation: (paperId: string) => ['explanation', paperId] as const,
+  notifications: ['notifications'] as const,
   saved: (sort: string) => ['saved', sort] as const,
   search: (query: string) => ['search', query] as const,
   canvas: () => ['canvas'] as const,
@@ -163,6 +164,14 @@ export function explanationQuery(api: ApiClient, paperId: string | null) {
     // within a session the answer will not change, and refetching on focus would make the
     // sheet flicker.
     staleTime: 30 * 60 * 1000,
+  };
+}
+
+/** The inbox (spec section 26). Presets are enforced at generation; this only reads. */
+export function notificationsQuery(api: ApiClient) {
+  return {
+    queryKey: queryKeys.notifications,
+    queryFn: () => api.notifications(),
   };
 }
 

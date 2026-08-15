@@ -39,6 +39,8 @@ import type {
   SavedPaperResponse,
   EquationGraphResponse,
   PaperRelationsResponse,
+  NotificationEntry,
+  NotificationListResponse,
   PaperExplanationResponse,
   ReadingPathResponse,
   SearchResponse,
@@ -295,6 +297,17 @@ export class ApiClient {
   /** Before you read and Why it matters, all AI-labelled (spec section 8). */
   paperExplanation(paperId: string): Promise<PaperExplanationResponse> {
     return this.request<PaperExplanationResponse>(`/papers/${paperId}/explanation`);
+  }
+
+  /** The notification inbox (spec section 26). Rows already passed the reader's preset. */
+  notifications(): Promise<NotificationListResponse> {
+    return this.request<NotificationListResponse>('/notifications');
+  }
+
+  markNotificationRead(notificationId: string): Promise<NotificationEntry> {
+    return this.request<NotificationEntry>(`/notifications/${notificationId}/read`, {
+      method: 'POST',
+    });
   }
 
   /** How a paper's equations depend on each other (spec section 28, Phase 7). */

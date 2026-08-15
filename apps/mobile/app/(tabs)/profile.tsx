@@ -7,6 +7,7 @@
  */
 import { Link } from 'expo-router';
 import { useState } from 'react';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -26,6 +27,7 @@ import { Chip } from '../../src/components/Chip';
 import { PressableRow } from '../../src/components/PressableRow';
 import { Text } from '../../src/components/Text';
 import { type MessageKey, translate } from '../../src/i18n';
+import { notificationsQuery, queryKeys } from '../../src/api/queries';
 import { clearCache } from '../../src/offline/cache';
 import { useTheme, useThemeControls } from '../../src/theme/ThemeProvider';
 import type { ColorSchemePreference } from '../../src/theme/theme';
@@ -159,10 +161,11 @@ export default function ProfileScreen() {
             />
           ))}
         </View>
-        {/* Said plainly rather than left for someone to discover by waiting for one. */}
+        {/* Said plainly rather than left for someone to discover by not being buzzed. */}
         <Text variant="caption" tone="secondary">
-          {t('notify.notYetDelivered')}
+          {t('notify.inboxOnly')}
         </Text>
+        <NotificationInbox locale={locale} />
       </Section>
 
       <Section title={t('profile.display')}>
@@ -235,5 +238,64 @@ export default function ProfileScreen() {
         )}
       </Section>
     </ScrollView>
+  );
+}
+
+/**
+ * The inbox itself (spec section 26). Everything here already passed the reader's preset
+ * at generation time — the client never filters, because a client trusted to hide rows is
+ * one bug away from showing a `none` reader a notification.
+ */
+function NotificationInbox({ locale }: { locale: 'ja' | 'en' }) {
+  const theme = useTheme();
+  const { api } = useSession();
+  const queryClient = useQueryClient();
+  const t = (key: MessageKey) => translate(locale, key);
+  const inbox = useQuery(notificationsQuery(api));
+  const markRead = useMutation({
+    mutationFn: (id: string) => api.markNotificationRead(id),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.notifications }),
+  });
+
+  if (inbox.isPending || inbox.isError) return null;
+  if (inbox.data.notifications.length === 0) {
+    return (
+      <Text variant="caption" tone="secondary">
+        {t('notify.inboxEmpty')}
+      </Text>
+    );
+  }
+
+  return (
+    <View style={{ gap: theme.spacing.sm }}>
+      {inbox.data.unreadCount > 0 && (
+        <Text variant="caption" tone="accent" accessibilityLiveRegion="polite">
+          {t('notify.unread').replace('{count}', String(inbox.data.unreadCount))}
+        </Text>
+      )}
+      {inbox.data.notifications.map((entry) => (
+        <PressableRow
+          key={entry.id}
+          onPress={entry.readAt === null ? () => markRead.mutate(entry.id) : undefined}
+          accessibilityLabel={`${entry.title}. ${entry.body}${entry.readAt === null ? `. ${t('notify.markRead')}` : ''}`}
+        >
+          <View style={{ gap: 2, flexShrink: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+              {/* The unread mark is a filled/empty word, not only a colour (spec section
+                  20: 色覚多様性 — and a grey dot means nothing in greyscale). */}
+              <Text variant="caption" tone={entry.readAt === null ? 'accent' : 'secondary'}>
+                {entry.readAt === null ? t('notify.unreadMark') : t('notify.readMark')}
+              </Text>
+              <Text style={{ flexShrink: 1 }} numberOfLines={2}>
+                {entry.title}
+              </Text>
+            </View>
+            <Text variant="caption" tone="secondary" numberOfLines={3}>
+              {entry.body}
+            </Text>
+          </View>
+        </PressableRow>
+      ))}
+    </View>
   );
 }

@@ -571,3 +571,21 @@ export interface PaperExplanationResponse {
   beforeYouRead: ExplanationSection;
   whyItMatters: ExplanationSection[];
 }
+
+/** One inbox entry (spec section 26). Written server-side under the reader's preset. */
+export interface NotificationEntry {
+  id: Uuid;
+  category: string;
+  title: string;
+  body: string;
+  entityType: string | null;
+  entityId: string | null;
+  createdAt: Iso8601;
+  readAt: Iso8601 | null;
+}
+
+export interface NotificationListResponse {
+  notifications: NotificationEntry[];
+  /** Computed server-side so every client agrees. */
+  unreadCount: number;
+}

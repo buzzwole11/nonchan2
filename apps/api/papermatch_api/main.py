@@ -22,6 +22,7 @@ from papermatch_api.routers import (
     fields,
     health,
     learn,
+    notifications,
     papers,
     saved,
     translations,
@@ -107,6 +108,7 @@ def create_app() -> FastAPI:
         learn.router,
         equations.router,
         canvas.router,
+        notifications.router,
     ):
         app.include_router(router)
 

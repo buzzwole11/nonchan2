@@ -57,6 +57,19 @@ curl -s localhost:8000/math-cards/$ID | jq '.steps[] | {verificationStatus, oper
 curl -s "localhost:8000/math-cards/$ID?includeUnverified=true" | jq '.hiddenStepCount'
 ```
 
+## 完成までに残っている操作（コードは全部書いてあります）
+
+実装はすべて済んでいて、残りは**この開発環境の外でしかできない操作**だけです。それぞれ 1 つの設定変更か 1 コマンドで、コードの変更は要りません。
+
+| # | 操作 | それで動くもの |
+| --- | --- | --- |
+| 1 | **egress の許可**: Claude Code の環境設定（ネットワークポリシー）で `export.arxiv.org` と `api.openalex.org` を許可する | 実データの取り込み（`PAPERMATCH_PAPER_PROVIDER=arxiv` + worker）、疎通テスト `pytest -m live`、実データ 100 件でのフィード確認、英語難易度の較正 |
+| 2 | **API 鍵**: 環境変数 `PAPERMATCH_ANTHROPIC_API_KEY` を設定し、`PAPERMATCH_TRANSLATION_PROVIDER=anthropic` `PAPERMATCH_EXPLANATION_PROVIDER=anthropic` にする | 実翻訳（6 段階すべて）、Before you read の生成部分、Why it matters の 4 種。鍵はサーバ側だけに置く（仕様書 25 節） |
+| 3 | **実機**: 手元のマシンで `npm install && npm run mobile`、Expo Go で開く | TASKS.md の実機チェックリスト（文タップ選択、WebView の数式、VoiceOver、Dynamic Type、機内モード）と Maestro E2E |
+| 4 | **push 配信**（任意）: APNs / FCM などの配信チャネルを接続する | 通知が受信箱に加えて端末にも届く。プリセット・静音時間・1日1回は生成時に適用済みなので、チャネル側の判断は不要（`notifications` テーブルの行を送るだけ） |
+
+この環境の egress 拒否は組織ポリシーの 403 で、回避はしません（proxy の指示どおり報告のみ）。1 と 2 は [claude.ai/code](https://claude.ai/code) の環境設定から変更できます。
+
 ## 実データ Provider（arXiv / OpenAlex）
 
 `PAPERMATCH_PAPER_PROVIDER` で切り替えます。既定は `mock`（サンプルコーパス）です。

@@ -21,6 +21,7 @@ from papermatch_api.services.fulltext import load_full_texts
 from papermatch_api.services.ingestion import ingest, load_fields
 from papermatch_api.services.math_content import load_math_cards
 from papermatch_api.services.metrics import collect
+from papermatch_api.services.notification_inbox import generate_for_all
 from papermatch_api.services.review import review_queue
 from papermatch_api.services.worker import default_jobs, run_summary, summarise, tick
 
@@ -80,6 +81,15 @@ def worker(once: bool, interval_seconds: int) -> int:
                 summarise(run) if run.error is None else f"{summarise(run)} error={run.error}"
                 for run in tick(session, {provider.name: provider}, specs)
             ]
+            # After ingestion, so a retraction pulled in this pass notifies in this pass.
+            # Idempotent: the (user, category, entity) key makes re-runs no-ops.
+            inbox = generate_for_all(session)
+            if inbox.written or inbox.withheld:
+                held = ", ".join(f"{k}×{v}" for k, v in sorted(inbox.withheld.items()))
+                lines.append(
+                    f"notifications: {inbox.written} written"
+                    + (f" ({held} withheld)" if held else "")
+                )
 
         for line in lines or ["nothing due"]:
             print(line)

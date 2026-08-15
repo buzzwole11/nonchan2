@@ -906,6 +906,47 @@ class AbstractExplanation(Base, GenerationProvenanceMixin, TimestampMixin):
     unavailable_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class Notification(Base):
+    """One delivered (or deliverable) notification, and whether it was read (spec section 26).
+
+    **The inbox is the delivery, in this build.** Section 26's presets and quiet hours are
+    enforced at *generation* time by `services/notifications.may_notify`, so a row here is
+    a notification the reader agreed to receive. Push is a transport for the same row, not
+    a different thing — when a push channel is wired up it sends what this table already
+    holds, and until then the app shows the inbox and nothing buzzes.
+
+    **Append-only, with `read_at` the only mutable column.** A notification that could be
+    edited after delivery could be made to have said something else; the audit answer to
+    「なぜ通知されたのか」 is the row plus `decision_reason`, frozen at generation.
+    """
+
+    __tablename__ = "notifications"
+    __table_args__ = (
+        vocab_check("category", "notificationCategory"),
+        Index("ix_notifications_user_created", "user_id", "created_at"),
+        # The generator's dedup key: "have I already told this reader about this thing".
+        UniqueConstraint("user_id", "category", "entity_id", name="uq_notification_subject"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UuidType, primary_key=True, default=_uuid)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UuidType, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    category: Mapped[str] = mapped_column(String(32), nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    #: What the notification is about, so the client can open it: `paper`, `math_card`,
+    #: `expression` — the vocabulary is the entity the category concerns.
+    entity_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    entity_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    #: `may_notify`'s reason, frozen here so the row can explain itself later.
+    decision_reason: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class AuditLog(Base):
     """Append-only record of consequential events (spec section 0: 監査ログ).
 

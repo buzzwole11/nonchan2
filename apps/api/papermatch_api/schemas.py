@@ -866,3 +866,23 @@ class PaperExplanationResponse(CamelModel):
     paper_id: uuid.UUID
     before_you_read: ExplanationSectionOut
     why_it_matters: list[ExplanationSectionOut]
+
+
+class NotificationOut(CamelModel):
+    """One inbox entry (spec section 26). Written under the reader's preset; see
+    `services/notification_inbox`."""
+
+    id: uuid.UUID
+    category: str
+    title: str
+    body: str
+    entity_type: str | None
+    entity_id: str | None
+    created_at: datetime
+    read_at: datetime | None
+
+
+class NotificationListResponse(CamelModel):
+    notifications: list[NotificationOut]
+    #: For the tab badge — computed server-side so every client agrees.
+    unread_count: int
