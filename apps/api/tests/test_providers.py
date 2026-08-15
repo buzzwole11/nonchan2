@@ -43,9 +43,12 @@ def test_mock_translation_provider_satisfies_the_interface() -> None:
 
 
 def test_every_registered_provider_is_constructible() -> None:
+    # The key-gated providers refuse to construct without a key — that refusal is their
+    # contract (a misconfigured provider must fail where an operator sees it), so they are
+    # constructed with one here rather than excused from the test.
     from papermatch_api.config import get_settings
 
-    settings = get_settings()
+    settings = get_settings().model_copy(update={"anthropic_api_key": "test-key"})
     for factory in PAPER_PROVIDERS.values():
         assert isinstance(factory(settings), PaperProvider)
     for factory in TRANSLATION_PROVIDERS.values():

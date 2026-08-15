@@ -767,7 +767,8 @@ class CanvasPosition(Base, TimestampMixin):
             "user_id", "entity_type", "entity_id", "layout_version", name="uq_canvas_entity_layout"
         ),
         CheckConstraint(
-            "entity_type IN ('paper', 'equation', 'expression')", name="ck_canvas_entity_type"
+            "entity_type IN ('paper', 'equation', 'expression', 'math_card')",
+            name="ck_canvas_entity_type",
         ),
     )
 

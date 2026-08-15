@@ -12,6 +12,7 @@ from typing import TypeVar
 
 from papermatch_api.config import Settings, get_settings
 from papermatch_api.providers.anthropic_explanation import AnthropicExplanationProvider
+from papermatch_api.providers.anthropic_translation import AnthropicTranslationProvider
 from papermatch_api.providers.arxiv import ArxivPaperProvider
 from papermatch_api.providers.base import (
     ExplanationProvider,
@@ -41,6 +42,12 @@ PAPER_PROVIDERS: dict[str, PaperProviderFactory] = {
 
 TRANSLATION_PROVIDERS: dict[str, TranslationProviderFactory] = {
     "mock": lambda _settings: MockTranslationProvider(),
+    # The real one (spec section 7), key-gated like the explanation provider. `mock` stays
+    # the default so a checkout with no key still runs end to end.
+    "anthropic": lambda settings: AnthropicTranslationProvider(
+        api_key=settings.anthropic_api_key,
+        model=settings.translation_model,
+    ),
 }
 
 # Only a fixture source so far. arXiv serves e-print sources, but section 21 forbids using

@@ -19,9 +19,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from papermatch_api.db import get_db
-from papermatch_api.models import Paper, SavedPaper
+from papermatch_api.models import MathCard, Paper, SavedPaper
 from papermatch_api.routers.papers import serialize_paper
-from papermatch_api.schemas import CanvasResponse, CanvasTileOut, MoveTileRequest
+from papermatch_api.schemas import (
+    CanvasResponse,
+    CanvasTileOut,
+    MathCardTeaserOut,
+    MoveTileRequest,
+)
 from papermatch_api.security import CurrentUser
 from papermatch_api.services.canvas import LAYOUT_VERSION, layout_for, move_tile
 
@@ -38,17 +43,39 @@ def read_canvas(
     if not tiles:
         return CanvasResponse(tiles=[], layout_version=LAYOUT_VERSION)
 
+    paper_ids = {
+        tile.anchor_paper_id if tile.anchor_paper_id is not None else tile.entity_id
+        for tile in tiles
+    }
     papers = {
         paper.id: paper
         for paper in db.execute(
             select(Paper)
             .options(selectinload(Paper.identifiers), selectinload(Paper.field_weights))
-            .where(Paper.id.in_([tile.entity_id for tile in tiles]))
+            .where(Paper.id.in_(paper_ids))
+        ).scalars()
+    }
+    cards = {
+        card.id: card
+        for card in db.execute(
+            select(MathCard).where(
+                MathCard.id.in_(
+                    [tile.entity_id for tile in tiles if tile.entity_type == "math_card"]
+                )
+            )
         ).scalars()
     }
 
-    return CanvasResponse(
-        tiles=[
+    out: list[CanvasTileOut] = []
+    for tile in tiles:
+        anchor_id = tile.anchor_paper_id if tile.anchor_paper_id is not None else tile.entity_id
+        paper = papers.get(anchor_id)
+        if paper is None:
+            continue
+        card = cards.get(tile.entity_id) if tile.entity_type == "math_card" else None
+        if tile.entity_type == "math_card" and card is None:
+            continue
+        out.append(
             CanvasTileOut(
                 entity_type=tile.entity_type,
                 entity_id=tile.entity_id,
@@ -58,13 +85,26 @@ def read_canvas(
                 weight=tile.weight,
                 user_override=tile.user_override,
                 saved_at=tile.saved_at,
-                paper=serialize_paper(papers[tile.entity_id]),
+                # The anchoring paper either way: a maths-card tile is coloured and
+                # clustered by the saved paper it belongs to (spec section 13).
+                paper=serialize_paper(paper),
+                math_card=(
+                    None
+                    if card is None
+                    else MathCardTeaserOut(
+                        card_id=card.id,
+                        card_type=card.card_type,
+                        title=card.title,
+                        level=card.level,
+                        provenance_kind=card.provenance_kind,
+                        paper_id=paper.id,
+                        paper_title=paper.title,
+                    )
+                ),
             )
-            for tile in tiles
-            if tile.entity_id in papers
-        ],
-        layout_version=LAYOUT_VERSION,
-    )
+        )
+
+    return CanvasResponse(tiles=out, layout_version=LAYOUT_VERSION)
 
 
 @router.patch("/canvas/{paper_id}", response_model=CanvasResponse)

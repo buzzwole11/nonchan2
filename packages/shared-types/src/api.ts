@@ -84,11 +84,31 @@ export interface PaperListResponse {
   nextCursor: string | null;
 }
 
+/**
+ * One maths card offered beside the feed (spec section 10: Discoverフィードへ低頻度で混ぜる).
+ *
+ * Not a `FeedItem`: it is a different kind of thing and is rendered as one — an invitation
+ * beside the deck, never a card inside the 70/20/10.
+ */
+export interface MathCardTeaser {
+  cardId: Uuid;
+  cardType: string;
+  title: string;
+  level: string;
+  /** Always `ai_explanation`; the invitation carries the label the card itself does. */
+  provenanceKind: string;
+  paperId: Uuid;
+  /** The saved paper the card belongs to — the reason this reader is seeing it. */
+  paperTitle: string;
+}
+
 export interface FeedResponse {
   items: FeedItem[];
   nextCursor: string | null;
   /** True when served from cache because a provider was unavailable (spec section 25). */
   degraded: boolean;
+  /** At most one, first page only, at most every 7 days (section 10: 低頻度). */
+  mathCard: MathCardTeaser | null;
 }
 
 // ------------------------------------------------------------- impressions and actions
@@ -493,7 +513,13 @@ export interface CanvasTile {
   userOverride: boolean;
   /** When the reader saved it. Section 13's timeline slider replays the plane by this. */
   savedAt: Iso8601;
+  /**
+   * For a `math_card` tile, the saved paper the card belongs to; colour and cluster come
+   * from the reader's own library either way. For a `paper` tile, simply the paper.
+   */
   paper: Paper;
+  /** Present only on `math_card` tiles (spec section 10: Canvas上の独立タイル). */
+  mathCard: MathCardTeaser | null;
 }
 
 export interface CanvasResponse {

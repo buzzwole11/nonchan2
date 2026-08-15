@@ -8,6 +8,7 @@
  */
 import type { SaveReason } from '@papermatch/shared-types';
 import * as WebBrowser from 'expo-web-browser';
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -62,6 +63,7 @@ export default function DiscoverScreen() {
   // Set by the effect below, on the render where the card actually reaches the screen.
   const shownAtRef = useRef<number>(0);
 
+  const router = useRouter();
   const locale: 'ja' | 'en' = (user?.settings.locale ?? 'ja').startsWith('en') ? 'en' : 'ja';
   const t = (key: MessageKey, params?: Record<string, string | number>) =>
     translate(locale, key, params);
@@ -211,6 +213,53 @@ export default function DiscoverScreen() {
         )}
       </View>
 
+      {/* Section 10: a maths card offered beside the deck, never inside the 70/20/10.
+          Dismissable, and quiet for a week either way — the server recorded the offer. */}
+      {deck.mathCardTeaser !== null && (
+        <View
+          style={[
+            styles.teaserRow,
+            {
+              marginHorizontal: theme.spacing.screenHorizontal,
+              borderColor: theme.color.border,
+              backgroundColor: theme.color.card,
+              borderRadius: theme.radius.card,
+            },
+          ]}
+        >
+          <PressableRow
+            onPress={() => {
+              const cardId = deck.mathCardTeaser?.cardId;
+              deck.dismissMathCardTeaser();
+              if (cardId !== undefined) router.push(`/math/${cardId}`);
+            }}
+            accessibilityLabel={t('discover.mathTeaser', {
+              title: deck.mathCardTeaser.title,
+              paper: deck.mathCardTeaser.paperTitle,
+            })}
+            style={styles.teaserBody}
+          >
+            <View style={styles.teaserText}>
+              <Text variant="caption" tone="secondary">
+                {t('discover.mathTeaserLabel')}
+              </Text>
+              <Text numberOfLines={1}>{deck.mathCardTeaser.title}</Text>
+              <Text variant="caption" tone="secondary" numberOfLines={1}>
+                {t('discover.mathTeaserFrom', { paper: deck.mathCardTeaser.paperTitle })}
+              </Text>
+            </View>
+          </PressableRow>
+          <PressableRow
+            onPress={deck.dismissMathCardTeaser}
+            accessibilityLabel={t('discover.mathTeaserDismiss')}
+          >
+            <Text variant="caption" tone="secondary">
+              ×
+            </Text>
+          </PressableRow>
+        </View>
+      )}
+
       <View style={[styles.deckArea, { margin: theme.spacing.screenHorizontal }]}>
         {current !== null ? (
           <SwipeDeck
@@ -326,6 +375,13 @@ export default function DiscoverScreen() {
 }
 
 const styles = StyleSheet.create({
+  teaserRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  teaserBody: { flex: 1 },
+  teaserText: { gap: 2, flexShrink: 1 },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',

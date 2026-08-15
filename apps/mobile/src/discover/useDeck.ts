@@ -7,7 +7,7 @@
  */
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 
-import type { FeedItem, SaveReason } from '@papermatch/shared-types';
+import type { FeedItem, MathCardTeaser, SaveReason } from '@papermatch/shared-types';
 
 import { NetworkError } from '../api/client';
 import { useSession } from '../api/session';
@@ -43,6 +43,12 @@ export interface DeckController {
    * can offer Undo, or to null when the request could not be sent.
    */
   sendFeedback: (control: FeedbackControl) => Promise<string | null>;
+  /**
+   * A maths card offered with the first page, or null — null most of the time by design
+   * (spec section 10: 低頻度). Rendered beside the deck, never as a card in it.
+   */
+  mathCardTeaser: MathCardTeaser | null;
+  dismissMathCardTeaser: () => void;
 }
 
 export function useDeck(): DeckController {
@@ -70,6 +76,10 @@ export function useDeck(): DeckController {
           items: page.items,
           cursor: page.nextCursor,
           degraded: page.degraded,
+          // The server has already recorded the offer, so it is shown rather than saved
+          // for later — held back it would just expire inside the cooldown. Later pages
+          // pass undefined and leave the current offer alone.
+          mathCard: cursor === null ? page.mathCard : undefined,
         });
         // Only the first page is worth caching: it is what a cold offline start shows.
         if (cursor === null) void cacheFeed(page.items, page.nextCursor);
@@ -222,6 +232,8 @@ export function useDeck(): DeckController {
       state,
       current: currentCard(state),
       next: nextCard(state),
+      mathCardTeaser: state.mathCardTeaser,
+      dismissMathCardTeaser: () => dispatch({ type: 'math_teaser_dismissed' }),
       act,
       setSaveReasons,
       undo,

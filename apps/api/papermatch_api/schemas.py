@@ -327,11 +327,30 @@ class FeedItemOut(CamelModel):
     score_breakdown: dict[str, float]
 
 
+class MathCardTeaserOut(CamelModel):
+    """One maths card offered beside the feed (spec section 10).
+
+    Not a `FeedItemOut`: it is a different kind of thing and must look like one. Carrying
+    the paper's title is what lets the client say *why* this reader is seeing it — "from a
+    paper you saved" — rather than presenting the card as an advertisement.
+    """
+
+    card_id: uuid.UUID
+    card_type: str
+    title: str
+    level: str
+    provenance_kind: str
+    paper_id: uuid.UUID
+    paper_title: str
+
+
 class FeedResponse(CamelModel):
     items: list[FeedItemOut]
     next_cursor: str | None = None
     #: True when a provider was unavailable and this page is served from cache.
     degraded: bool = False
+    #: At most one, first page only, at most every 7 days (spec section 10: 低頻度).
+    math_card: MathCardTeaserOut | None = None
 
 
 # ---------------------------------------------------------------------------- saved
@@ -681,7 +700,12 @@ class CanvasTileOut(CamelModel):
     user_override: bool
     #: When the reader saved it, for section 13's 年月スライダーで保存履歴を再生.
     saved_at: datetime
+    #: For a `math_card` tile: the anchoring paper — the saved paper the card belongs to —
+    #: so colour and cluster still come from the reader's own library. For a `paper` tile,
+    #: simply the paper.
     paper: PaperOut
+    #: Present only on `math_card` tiles (spec section 10: Canvas上の独立タイル).
+    math_card: MathCardTeaserOut | None = None
 
 
 class CanvasResponse(CamelModel):

@@ -120,6 +120,8 @@ export const ACTION_TYPES = [
   'more_classic',
   /** Section 9: the app noting that it brought a saved paper back, so it does not again. */
   'resurface_saved',
+  /** Section 10: the app noting that it offered a maths card in Discover, so it waits. */
+  'mathcard_teaser',
   'undo',
 ] as const;
 

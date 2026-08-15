@@ -21,11 +21,12 @@ from papermatch_api.schemas import (
     CreateImpressionsResponse,
     FeedItemOut,
     FeedResponse,
+    MathCardTeaserOut,
     SavedPaperOut,
     UndoResponse,
 )
 from papermatch_api.security import CurrentUser
-from papermatch_api.services import activity
+from papermatch_api.services import activity, mathcard_feed
 from papermatch_api.services import feed as feed_service
 
 router = APIRouter(tags=["feed"])
@@ -77,6 +78,23 @@ def get_feed(
 
     page = feed_service.build_feed(db, user, limit=limit, cursor=cursor, degraded=degraded)
 
+    # Section 10: Discoverフィードへ低頻度で混ぜる. First page only, never inside the
+    # 70/20/10 (same reasoning as the resurfaced paper), quiet for a week after each offer.
+    teaser = None
+    if cursor is None and page.items:
+        offered = mathcard_feed.pick(db, user)
+        if offered is not None:
+            mathcard_feed.record(db, user, offered)
+            teaser = MathCardTeaserOut(
+                card_id=offered.card.id,
+                card_type=offered.card.card_type,
+                title=offered.card.title,
+                level=offered.card.level,
+                provenance_kind=offered.card.provenance_kind,
+                paper_id=offered.paper.id,
+                paper_title=offered.paper.title,
+            )
+
     paper_ids = [candidate.paper.id for candidate in page.items]
     segments: dict[uuid.UUID, list[AbstractSegment]] = {}
     if paper_ids:
@@ -100,6 +118,7 @@ def get_feed(
         ],
         next_cursor=page.next_cursor,
         degraded=page.degraded,
+        math_card=teaser,
     )
 
 

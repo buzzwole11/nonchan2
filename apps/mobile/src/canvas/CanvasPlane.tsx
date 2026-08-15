@@ -330,6 +330,11 @@ export function CanvasPlane({
             const top = originY + (tile.y + nudge.dy - box.minY) * unit - size / 2;
 
             const colour = tileColor(tile);
+            // Section 10's 独立タイル: a maths card is drawn in its paper's colour (it
+            // belongs to the reader's library) but visibly as a different kind of thing —
+            // a dashed border and a ∑ where a paper tile shows its field. Shape, not
+            // colour, carries the distinction (spec section 20: 色覚多様性).
+            const isMathCard = tile.entityType === 'math_card';
 
             return (
               <Pressable
@@ -350,8 +355,9 @@ export function CanvasPlane({
                   backgroundColor: colour,
                   // The selected tile is marked by border and elevation as well as by having
                   // moved, so Reduce Motion loses nothing but the movement.
-                  borderWidth: isSelected ? 3 : StyleSheet.hairlineWidth,
+                  borderWidth: isSelected ? 3 : isMathCard ? 1 : StyleSheet.hairlineWidth,
                   borderColor: isSelected ? theme.color.textPrimary : theme.color.border,
+                  borderStyle: isMathCard ? 'dashed' : 'solid',
                   // Dimming the rest is section 13's 背景が暗くなる, done by fading the tiles
                   // rather than overlaying the plane, so the selected tile stays fully legible.
                   opacity: selected === null || isSelected ? 1 : 0.45,
@@ -371,7 +377,7 @@ export function CanvasPlane({
                     }}
                     numberOfLines={2}
                   >
-                    {tile.clusterId ?? ''}
+                    {isMathCard ? '∑' : (tile.clusterId ?? '')}
                   </Text>
                 )}
               </Pressable>

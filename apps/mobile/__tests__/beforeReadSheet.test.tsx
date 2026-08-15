@@ -21,9 +21,10 @@ jest.mock('../src/api/useApi', () => ({
 // `explanationQuery` lives in queries.ts, which also carries the offline-cache queries and
 // through them AsyncStorage — a native module Jest does not have. The cache is not under
 // test here.
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factories run
-// before imports, so the mock module can only be loaded this way.
+// A jest.mock factory runs before imports, so the mock module can only be loaded there
+// with require.
 jest.mock('@react-native-async-storage/async-storage', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
 

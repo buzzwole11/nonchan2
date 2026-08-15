@@ -15,7 +15,7 @@
  *   to be there without a wait; a deck that fetches when it hits zero always shows a
  *   spinner between cards.
  */
-import type { FeedItem } from '@papermatch/shared-types';
+import type { FeedItem, MathCardTeaser } from '@papermatch/shared-types';
 
 /** Fetch more when this many cards remain (spec section 25: 次カードを事前取得). */
 export const PREFETCH_THRESHOLD = 5;
@@ -43,11 +43,25 @@ export interface DeckState {
   /** Impressions recorded but not yet accepted by the server. */
   unsentImpressions: { paperId: string; position: number; dwellMs: number | null }[];
   error: 'offline' | 'failed' | null;
+  /**
+   * A maths card offered with the first page, or null — null most of the time by design
+   * (spec section 10: 低頻度). Not a queue entry: it takes no slot and paging never
+   * touches it. In the reducer rather than component state so loading and dismissal go
+   * through the same dispatch path as everything else the deck shows.
+   */
+  mathCardTeaser: MathCardTeaser | null;
 }
 
 export type DeckEvent =
   | { type: 'load_started' }
-  | { type: 'page_loaded'; items: FeedItem[]; cursor: string | null; degraded: boolean }
+  | {
+      type: 'page_loaded';
+      items: FeedItem[];
+      cursor: string | null;
+      degraded: boolean;
+      mathCard?: MathCardTeaser | null;
+    }
+  | { type: 'math_teaser_dismissed' }
   | { type: 'load_failed'; reason: 'offline' | 'failed' }
   | { type: 'card_acted'; direction: SwipeDirection }
   | { type: 'action_confirmed'; actionId: string }
@@ -58,6 +72,7 @@ export type DeckEvent =
   | { type: 'reset' };
 
 export const initialDeckState: DeckState = {
+  mathCardTeaser: null,
   queue: [],
   cursor: null,
   degraded: false,
@@ -93,8 +108,14 @@ export function deckReducer(state: DeckState, event: DeckEvent): DeckState {
         loading: false,
         error: null,
         exhausted: event.cursor === null && queue.length === 0,
+        // Only the first page carries an offer; later pages leave the current one alone
+        // (undefined) rather than clearing an invitation the reader has not answered.
+        mathCardTeaser: event.mathCard === undefined ? state.mathCardTeaser : event.mathCard,
       };
     }
+
+    case 'math_teaser_dismissed':
+      return { ...state, mathCardTeaser: null };
 
     case 'load_failed':
       return {

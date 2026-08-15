@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     #: is the one that cannot invent anything.
     explanation_provider: str = "derived"
     explanation_model: str = "claude-haiku-4-5-20251001"
+    translation_model: str = "claude-haiku-4-5-20251001"
     #: **Server-side only.** Spec section 25: API キーをクライアントに置かない. The mobile app
     #: calls this API; this API calls the model. Never serialised into a response, a health
     #: payload or the audit log.

@@ -50,17 +50,19 @@ from __future__ import annotations
 import hashlib
 import math
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import Row, select
 from sqlalchemy.orm import Session
 
 from papermatch_api.models import (
     CanvasPosition,
     Embedding,
+    Equation,
     Field,
+    MathCard,
     Paper,
     SavedPaper,
     User,
@@ -128,6 +130,9 @@ class PlacedTile:
     #: tile: the plane is what gets replayed, and a second request per tile to find out when
     #: each one arrived would make the slider unusable.
     saved_at: datetime
+    #: For a `math_card` tile, the saved paper it belongs to; the router serialises that
+    #: paper as the tile's anchor. `None` on paper tiles, whose entity *is* the paper.
+    anchor_paper_id: uuid.UUID | None = None
 
 
 def _hash_unit(text: str, salt: str) -> float:
@@ -348,7 +353,111 @@ def layout_for(session: Session, user: User, *, limit: int = 500) -> list[Placed
             )
         )
 
+    tiles.extend(_math_card_tiles(session, user, rows, existing, taken))
+
     session.flush()
+    return tiles
+
+
+#: A maths card tile is deliberately small and fixed: its size means "there is maths here",
+#: not "this is important", and letting it grow would let a card outrank the papers that
+#: give the plane its shape (spec sections 10, 13).
+MATH_TILE_WEIGHT = 0.3
+
+
+def _math_card_tiles(
+    session: Session,
+    user: User,
+    rows: Sequence[Row[tuple[SavedPaper, Paper]]],
+    paper_positions: dict[uuid.UUID, CanvasPosition],
+    taken: set[tuple[int, int]],
+) -> list[PlacedTile]:
+    """Independent tiles for maths cards on saved papers (spec section 10).
+
+    独立タイル — its own tile, not a badge on the paper's. It is placed *beside* its paper,
+    because the card belongs to the paper's neighbourhood and a card placed by its own
+    embedding would sit alone in a part of the plane the reader has no other reason to
+    visit. Placement persists like any other tile, so the plane stays still between visits,
+    and a dragged card stays where the reader put it.
+    """
+    saved_papers = {paper.id: (saved, paper) for saved, paper in rows}
+    if not saved_papers:
+        return []
+
+    # Cards whose equations come from a saved paper. One query for the join table rather
+    # than one per card.
+    cards = list(session.execute(select(MathCard)).scalars())
+    equation_ids = [
+        uuid.UUID(value) for card in cards for value in card.source_equation_ids if value
+    ]
+    if not equation_ids:
+        return []
+    equation_paper: dict[uuid.UUID, uuid.UUID] = dict(
+        session.execute(select(Equation.id, Equation.paper_id).where(Equation.id.in_(equation_ids)))
+        .tuples()
+        .all()
+    )
+
+    existing = {
+        position.entity_id: position
+        for position in session.execute(
+            select(CanvasPosition).where(
+                CanvasPosition.user_id == user.id,
+                CanvasPosition.entity_type == "math_card",
+                CanvasPosition.layout_version == LAYOUT_VERSION,
+            )
+        ).scalars()
+    }
+
+    tiles: list[PlacedTile] = []
+    for card in cards:
+        paper_id = next(
+            (
+                equation_paper.get(uuid.UUID(value))
+                for value in card.source_equation_ids
+                if uuid.UUID(value) in equation_paper
+            ),
+            None,
+        )
+        if paper_id is None or paper_id not in saved_papers:
+            continue
+        saved, paper = saved_papers[paper_id]
+
+        position = existing.get(card.id)
+        if position is None:
+            anchor = paper_positions.get(paper_id)
+            if anchor is None:
+                continue
+            column, row = _spiral(_cell(anchor.x, anchor.y), taken)
+            taken.add((column, row))
+            position = CanvasPosition(
+                user_id=user.id,
+                entity_type="math_card",
+                entity_id=card.id,
+                x=column * GRID_STEP,
+                y=row * GRID_STEP,
+                cluster_id=paper.primary_field_id,
+                layout_version=LAYOUT_VERSION,
+                user_override=False,
+            )
+            session.add(position)
+            existing[card.id] = position
+
+        tiles.append(
+            PlacedTile(
+                entity_type="math_card",
+                entity_id=card.id,
+                x=position.x,
+                y=position.y,
+                cluster_id=position.cluster_id,
+                weight=MATH_TILE_WEIGHT,
+                user_override=position.user_override,
+                # The paper's save date: the timeline replays the reader's history, and the
+                # card entered their world when the paper did.
+                saved_at=saved.saved_at,
+                anchor_paper_id=paper_id,
+            )
+        )
     return tiles
 
 

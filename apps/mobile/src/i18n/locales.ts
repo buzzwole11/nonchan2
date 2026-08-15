@@ -140,6 +140,11 @@ export const messages = {
     // 仕様書 8 節。すべて AI 生成か、論文自身からの引用で、どちらかをラベルに書きます。
     'explain.title': '読む前に',
     'discover.beforeRead': '予備知識',
+    // 仕様書 10 節: Discover への低頻度混入。枠は取らず、招待として横に置く。
+    'discover.mathTeaserLabel': '保存した論文の数式カード',
+    'discover.mathTeaser': '数式カード「{title}」を開く（{paper} より）',
+    'discover.mathTeaserFrom': '{paper} より',
+    'discover.mathTeaserDismiss': '数式カードの案内を閉じる',
     'a11y.beforeReadButton': '読む前の予備知識を表示',
     'explain.beforeYouRead': 'Before you read',
     'explain.whyItMatters': 'なぜ重要か',
@@ -303,6 +308,7 @@ export const messages = {
     'canvas.moved': 'この位置は自分で決めたものです',
     'canvas.openPaper': '原文を開く',
     'canvas.tile': '{title}（{field}）',
+    'canvas.mathTile': '数式カード「{title}」（{paper} より）。開くと Focus Mode',
     'canvas.tileHint': 'タップすると詳細を表示します',
     'canvas.layout': 'レイアウト {version}',
     'canvas.related': '同じ分野の近い論文',
@@ -621,6 +627,10 @@ export const messages = {
     // and the label says which.
     'explain.title': 'Before you read',
     'discover.beforeRead': 'Before you read',
+    'discover.mathTeaserLabel': 'A maths card from a paper you saved',
+    'discover.mathTeaser': 'Open the maths card "{title}" (from {paper})',
+    'discover.mathTeaserFrom': 'From {paper}',
+    'discover.mathTeaserDismiss': 'Dismiss the maths card invitation',
     'a11y.beforeReadButton': 'Show background before reading',
     'explain.beforeYouRead': 'Before you read',
     'explain.whyItMatters': 'Why it matters',
@@ -769,6 +779,7 @@ export const messages = {
     'canvas.moved': 'You placed this tile yourself',
     'canvas.openPaper': 'Open the source',
     'canvas.tile': '{title} ({field})',
+    'canvas.mathTile': 'Maths card "{title}" (from {paper}). Opens Focus Mode',
     'canvas.tileHint': 'Tap for details',
     'canvas.layout': 'Layout {version}',
     'canvas.related': 'Nearby in the same field',

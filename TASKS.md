@@ -131,7 +131,11 @@ AI が要る項目は環境制約で未着手です（DECISIONS.md D-024）。
       ラベルに書く**。開いた・訳した・状態を変えた論文は戻さない。一度戻して開かれ
       なかったら 14 日は放っておく（DECISIONS.md D-059）
 - [x] 翻訳シートからの「表現を保存」
-- [ ] 実翻訳 Provider の接続 — 翻訳 API への疎通が要る（説明 Provider は接続済み、下記）
+- [x] **実翻訳 Provider の接続**（`providers/anthropic_translation.py`）— 6 段階それぞれに
+      別のタスクとして指示を書く（同じ訳文の 6 通りの言い換えでは段階の意味が無い）。
+      数式トークンの欠落は provider が申告し、既存の「原文に戻す」経路に落ちる。
+      鍵はサーバ側のみ。読めない応答は ProviderUnavailable（= 原文表示）。
+      実呼び出しは鍵が無いため未検証、記録応答で全経路をテスト（DECISIONS.md D-064）
 - [x] **Before you read / Why it matters**（`providers/derived_explanation.py`,
       `providers/anthropic_explanation.py`, `services/explanations.py`,
       `GET /papers/{id}/explanation`, `src/discover/BeforeReadSheet.tsx`, migration `0011`）—
@@ -253,7 +257,13 @@ AI が要る項目は環境制約で未着手です（DECISIONS.md D-024）。
 - [x] Learn タブからの入口（仕様書 10 節の「Learnから復習」）
 - [ ] 矢印タップで中間式を開く — 中間式は Phase 5 の自動パイプラインが作るもので、
       いまのコーパスには存在しません。作れば捏造になります
-- [ ] 通知 / Discover への低頻度混入 / Canvas タイル（それぞれ通知基盤・推薦・Canvas 待ち）
+- [x] **Discover への低頻度混入 / Canvas タイル**（`services/mathcard_feed.py`,
+      `services/canvas.py`, migration `0012`, `useDeck` + Discover の案内行,
+      `CanvasPlane` の破線タイル）— どちらも読者の保存した論文のカードだけ。
+      混入は 70/20/10 の枠を取らず横に置き、1 回出したら 7 日黙る（低頻度は記憶で
+      実装する）。Canvas タイルは論文の隣に固定サイズ・破線で置き、タップで
+      Focus Mode（DECISIONS.md D-064）
+- [ ] 通知 — push 配信基盤が無いため未着手（プリセットと判定は実装済み）
 
 ---
 

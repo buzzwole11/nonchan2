@@ -17,6 +17,7 @@
  * when they clear it — the plane is a place (section 13), and a filter that re-packed it
  * would make it a different place each time.
  */
+import { useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as WebBrowser from 'expo-web-browser';
 import { useMemo, useState } from 'react';
@@ -60,6 +61,7 @@ export interface CanvasViewProps {
 }
 
 export function CanvasView({ selectedId, onSelectedChange }: CanvasViewProps) {
+  const router = useRouter();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -101,10 +103,18 @@ export function CanvasView({ selectedId, onSelectedChange }: CanvasViewProps) {
   const planeHeight = Math.max(280, Math.round(width * 0.95));
   const offPlane = offPlaneRelations(tiles, relations.data?.relations ?? []);
   const labelFor = (tile: CanvasTile) =>
-    t('canvas.tile', { title: tile.paper.title, field: tile.clusterId ?? '—' });
+    tile.mathCard !== null
+      ? t('canvas.mathTile', { title: tile.mathCard.title, paper: tile.paper.title })
+      : t('canvas.tile', { title: tile.paper.title, field: tile.clusterId ?? '—' });
   const scale = ZOOM_STEPS[zoomIndex] ?? 1;
 
   function select(tile: CanvasTile): void {
+    // A maths-card tile opens the card itself: its detail view is Focus Mode, and a
+    // second, thinner detail panel on the plane would be a worse copy of it.
+    if (tile.mathCard !== null) {
+      router.push(`/math/${tile.mathCard.cardId}`);
+      return;
+    }
     onSelectedChange(selectedId === tile.entityId ? null : tile.entityId);
   }
 
