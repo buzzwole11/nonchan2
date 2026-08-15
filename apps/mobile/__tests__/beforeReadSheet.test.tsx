@@ -86,7 +86,9 @@ const RESPONSE: PaperExplanationResponse = {
 };
 
 function renderSheet() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // `gcTime: 0` so the client holds no garbage-collection timers after unmount — those
+  // are what jest reports as "a worker process has failed to exit gracefully".
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   return render(
     <QueryClientProvider client={client}>
       <ThemeProvider initialPreference="light" forceReduceMotion={false} forceFontScale={1}>
@@ -110,6 +112,11 @@ function renderSheet() {
 beforeEach(() => {
   mockPaperExplanation.mockReset();
 });
+
+// The first test in a suite pays the whole import graph's transform cost, and on a cold
+// CI runner that alone has crossed jest's 5s default (passed at 334ms locally, timed out
+// at 5s on CI). The budget covers the cold start, not slow assertions.
+jest.setTimeout(15_000);
 
 describe('BeforeReadSheet', () => {
   it('labels a generated item as AI and a quoted item as from the paper', async () => {
@@ -186,7 +193,7 @@ describe('BeforeReadSheet', () => {
 
   it('fetches nothing while closed', () => {
     // 強制表示しない, and also a model call per passing card nobody asked for.
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
     render(
       <QueryClientProvider client={client}>
         <ThemeProvider initialPreference="light" forceReduceMotion={false} forceFontScale={1}>
