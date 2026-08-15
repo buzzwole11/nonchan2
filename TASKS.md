@@ -46,8 +46,8 @@
 
 完了条件は仕様書 29 節。
 
-### 1-A データソース接続 — 実装済み。疎通のみ未確認（DECISIONS.md D-016 / D-025）
-> この開発環境はパッケージレジストリ以外への外向き接続を遮断しており、arXiv と OpenAlex に一度も到達できません（proxy が CONNECT を拒否）。そのため **パーサとクライアントは記録形状のレスポンスに対して完成させ、実 API への疎通だけを opt-in テストに切り出しています**。`PAPERMATCH_LIVE_PROVIDERS=1 pytest -m live` で、外向き接続のある環境から疎通を確認してください。fixture は公開スキーマから手で起こしたもので、構造は本物・中身は合成です（各ファイル冒頭に明記）。
+### 1-A データソース接続 ✅（OpenAlex の polite pool 設定のみ任意で残る）
+> 開発初期はこの環境の egress が遮断されていたため、パーサは記録形状の fixture に対して完成させ、実 API への疎通は opt-in（`-m live`）に切り出していました（D-016 / D-025）。egress 許可後に実データで全段階を確認済みです（D-069）。
 
 - [x] `ArxivPaperProvider`（Atom API、3 秒間隔のレート制限、`arXiv:` 識別子、カテゴリ→分野マッピング、
       DOI 優先の canonical id、版番号の保持、journal_ref による published 判定）
@@ -56,17 +56,21 @@
 - [x] Provider ごとのサーキットブレーカーとレート制限（仕様書 25 節）— `providers/http.py`。
       429 / 5xx はブレーカーを開き、それ以外の 4xx は開かない（自分側のクエリ不備で Provider を落とさない）
 - [x] ライセンスの立場を明文化し、レコードに根拠 URL を同梱（DECISIONS.md D-025）
-- [ ] **実 API への疎通確認** — `cli live-check` に一本化済み。egress を許可した**後で
-      開いたセッション**から実行する（許可はコンテナ起動時に読まれる）。この環境では
-      proxy が `Host not in allowlist` を返す段階で止まることまで確認済み
+- [x] **実 API への疎通確認** — egress 許可後に `cli live-check` を実データで実行。
+      arXiv: 疎通・形状（10/10 利用可能・全件ライセンス記載）・`-m live` テストまで通過。
+      初回実行で provider の URL が `http://` だったことを検出（TLS 終端 proxy 環境では
+      構造的に到達不能）→ https に修正（DECISIONS.md D-069）。
+      OpenAlex は実 API に到達するが共有 IP の匿名枠で 429 — polite pool
+      （`PAPERMATCH_OPENALEX_MAILTO`）の設定待ち
 - [x] **取り込み worker**（`services/worker.py`、`cli.py worker` / `cli.py runs`）—
       discovery（新着を追う・cursor を永続化）と refresh（撤回・版更新を取り込み直す）の 2 種類。
       再取得キューは `last_refreshed_at` で並べる（DECISIONS.md D-034）。
       provider が返さない論文を撤回扱いにしない、失敗した run の cursor を継がない、
       1 つの job の失敗が他を止めない、をテストで固定
-- [ ] 実データ 100 件以上でフィードが構成できることの確認（仕様書 29 節）—
-      `cli live-check` の最終段階。取り込みまで通れば自動で判定し、100 件に届かない
-      場合は「届いていない」と明示する（黙って 40 件でフィードを作らない）
+- [x] **実データ 100 件以上でフィードが構成できることの確認（仕様書 29 節）** —
+      達成。実 arXiv から 3 分野 120 件を取り込み（重複統合 0・ライセンス見送り 0、
+      コーパス合計 169 件）、フィード 20 枚を構成（候補 168 件）。
+      `cli live-check` 全段階 ✓（DECISIONS.md D-069）
 
 ### 1-B フィード API ✅
 - [x] `GET /feed?mode=discover&cursor=` — 70/20/10 の枠配分、表示履歴による除外、推薦理由の付与

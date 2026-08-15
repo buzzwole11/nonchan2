@@ -39,7 +39,12 @@ from papermatch_api.providers.http import (
 )
 from papermatch_api.text.normalize import normalize_arxiv_id, normalize_doi
 
-API_URL = "http://export.arxiv.org/api/query"
+# https, not the `http://` the arXiv docs still print in examples. This was unreachable-
+# by-construction in any egress-controlled deployment — a TLS-terminating proxy only
+# tunnels CONNECT, so the plain-HTTP form 403s even with the host allowlisted — and it was
+# only ever exercised through fixtures until the first live run found it (D-066's whole
+# purpose). arXiv serves the API over https identically.
+API_URL = "https://export.arxiv.org/api/query"
 
 #: arXiv asks for at most one request every three seconds.
 MIN_REQUEST_INTERVAL_SECONDS = 3.0
