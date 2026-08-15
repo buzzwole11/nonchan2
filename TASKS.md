@@ -108,6 +108,10 @@
       **オフライン時のフォールバックは queryFn の中**に置いたので、AsyncStorage キャッシュは
       そのまま（DECISIONS.md D-040）。翻訳シートだけは query ではなく mutation
       （`POST /translations` は行を作る書き込み）
+- [x] **新規 3 面のブラウザ確認**（Discover の数式カード案内 / Before you read /
+      通知受信箱 / Canvas の数式タイル）— 実 API を通して Chromium で描画。
+      3 件の不具合を検出して修正（起動時 401 の誤表示 2 箇所、CORS が 127.0.0.1 を
+      弾く、同じ断り文の 4 回表示）。いずれも単体テストでは出ない（DECISIONS.md D-067）
 - [ ] **Maestro による E2E**（オンボーディング / スワイプ / Undo / 範囲選択翻訳 / オフライン /
       VoiceOver 操作）— 実機かエミュレータが要るため、この環境では実行できない（D-030）。
       web ハーネスでのフロー確認は Playwright で行っている

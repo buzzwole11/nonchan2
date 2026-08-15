@@ -34,6 +34,17 @@ export interface BeforeReadSheetProps {
   paperId: string | null;
   paperTitle: string | null;
   onClose: () => void;
+  /**
+   * False while the stored token is still being read back at start-up.
+   *
+   * Passed in rather than read from the session here: this sheet is presentational, and a
+   * component that reaches for the session is one its tests have to stand a whole provider
+   * up for. `saved.tsx` gates its queries the same way, for the same reason.
+   *
+   * Defaults to true so a caller that has no session concept (the visual harness) renders
+   * normally.
+   */
+  ready?: boolean;
 }
 
 export function BeforeReadSheet({
@@ -42,6 +53,7 @@ export function BeforeReadSheet({
   paperId,
   paperTitle,
   onClose,
+  ready = true,
 }: BeforeReadSheetProps) {
   const theme = useTheme();
   const t = (key: MessageKey) => translate(locale, key);
@@ -78,7 +90,7 @@ export function BeforeReadSheet({
 
           {/* Content only mounts while the sheet is open, so nothing is fetched for cards
               that merely scroll past (spec sections 8, 25). */}
-          {visible && <SheetBody locale={locale} paperId={paperId} />}
+          {visible && <SheetBody locale={locale} paperId={paperId} ready={ready} />}
 
           <PressableRow onPress={onClose} accessibilityLabel={t('explain.close')}>
             <Text>{t('explain.close')}</Text>
@@ -89,12 +101,22 @@ export function BeforeReadSheet({
   );
 }
 
-function SheetBody({ locale, paperId }: { locale: 'ja' | 'en'; paperId: string | null }) {
+function SheetBody({
+  locale,
+  paperId,
+  ready,
+}: {
+  locale: 'ja' | 'en';
+  paperId: string | null;
+  ready: boolean;
+}) {
   const api = useApiClient();
   const t = (key: MessageKey) => translate(locale, key);
-  const query = useQuery(explanationQuery(api, paperId));
+  const query = useQuery(explanationQuery(api, paperId, ready));
 
-  if (query.isPending) {
+  // Waiting for the session looks the same to a reader as waiting for the answer, and it
+  // is: both end with the explanation appearing. Reporting it as a failure would not.
+  if (query.isPending || !ready) {
     return (
       <Text tone="secondary" accessibilityLiveRegion="polite">
         {t('explain.loading')}
@@ -127,7 +149,53 @@ function SheetBody({ locale, paperId }: { locale: 'ja' | 'en'; paperId: string |
       <Text variant="label" accessibilityRole="header">
         {t('explain.whyItMatters')}
       </Text>
-      {query.data.whyItMatters.map((section) => (
+      <WhyItMatters locale={locale} sections={query.data.whyItMatters} />
+    </ScrollView>
+  );
+}
+
+/**
+ * Section 8's four readings — or, when none of them could be answered, one sentence.
+ *
+ * The default provider refuses all four for the same reason (it will not invent a claim
+ * about what a paper means to somebody). Rendering that per audience printed the identical
+ * paragraph four times under four headings, which reads as the screen being broken rather
+ * than as the app declining to guess. Found by looking at it.
+ *
+ * The collapse is conditional on the reasons actually matching: four *different* absences
+ * are four different facts, and a reader deciding whether to configure a model wants to
+ * see which ones a model would fill in.
+ */
+function WhyItMatters({
+  locale,
+  sections,
+}: {
+  locale: 'ja' | 'en';
+  sections: ExplanationSection[];
+}) {
+  const reasons = new Set(
+    sections.map((section) =>
+      section.items.length === 0 ? (section.unavailableReason ?? '') : '',
+    ),
+  );
+  const allEmptyForOneReason =
+    sections.length > 0 &&
+    sections.every((section) => section.items.length === 0 && section.unavailableReason) &&
+    reasons.size === 1;
+
+  if (allEmptyForOneReason) {
+    return (
+      <View style={styles.block}>
+        <Text variant="caption" tone="secondary">
+          {sections[0]?.unavailableReason}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <>
+      {sections.map((section) => (
         <Section
           key={section.audience}
           locale={locale}
@@ -135,7 +203,7 @@ function SheetBody({ locale, paperId }: { locale: 'ja' | 'en'; paperId: string |
           section={section}
         />
       ))}
-    </ScrollView>
+    </>
   );
 }
 

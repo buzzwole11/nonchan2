@@ -59,7 +59,13 @@ class Settings(BaseSettings):
 
     fixtures_dir: Path = Field(default=REPO_ROOT / "fixtures")
 
-    cors_allow_origins: list[str] = Field(default_factory=lambda: ["http://localhost:8081"])
+    #: Both spellings of the dev server's own address. They are different origins to a
+    #: browser, and Expo prints one while a developer may well open the other — at which
+    #: point every request fails CORS and the app is blank with nothing but a console
+    #: message to say why. Found by pointing a browser at 127.0.0.1 during a UI pass.
+    cors_allow_origins: list[str] = Field(
+        default_factory=lambda: ["http://localhost:8081", "http://127.0.0.1:8081"]
+    )
 
     # Spec section 25: input length and rate limits.
     max_selection_chars: int = 1500

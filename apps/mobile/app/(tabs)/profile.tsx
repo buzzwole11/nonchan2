@@ -248,10 +248,12 @@ export default function ProfileScreen() {
  */
 function NotificationInbox({ locale }: { locale: 'ja' | 'en' }) {
   const theme = useTheme();
-  const { api } = useSession();
+  const { api, status } = useSession();
   const queryClient = useQueryClient();
   const t = (key: MessageKey) => translate(locale, key);
-  const inbox = useQuery(notificationsQuery(api));
+  // Not before the stored token has been read back: a 401 here would render as an empty
+  // inbox, which is the one thing an inbox must never say wrongly.
+  const inbox = useQuery(notificationsQuery(api, status !== 'loading'));
   const markRead = useMutation({
     mutationFn: (id: string) => api.markNotificationRead(id),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.notifications }),

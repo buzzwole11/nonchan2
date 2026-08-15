@@ -143,6 +143,44 @@ describe('BeforeReadSheet', () => {
     expect(screen.getByText('もう一度')).toBeTruthy();
   });
 
+  it('says one sentence when every reading was refused for the same reason', async () => {
+    // The default provider refuses all four with the same sentence. Rendering it per
+    // audience printed the identical paragraph four times under four headings, which reads
+    // as the screen being broken rather than as the app declining to guess. Found by
+    // looking at the sheet in a browser.
+    const reason = '「なぜ重要か」は論文の位置づけについての判断で、メタデータからは導けません';
+    mockPaperExplanation.mockResolvedValue({
+      ...RESPONSE,
+      whyItMatters: RESPONSE.whyItMatters.map((section) => ({
+        ...section,
+        items: [],
+        unavailableReason: reason,
+      })),
+    });
+    renderSheet();
+
+    await waitFor(() => expect(screen.getAllByText(reason).length).toBe(1));
+    // And the four headings go with it: a heading over nothing is the same noise.
+    expect(screen.queryByText('分野史上の位置づけ')).toBeNull();
+  });
+
+  it('keeps the four headings when the absences differ', async () => {
+    // Four *different* absences are four different facts, and a reader deciding whether to
+    // configure a model wants to see which ones a model would fill in.
+    mockPaperExplanation.mockResolvedValue({
+      ...RESPONSE,
+      whyItMatters: RESPONSE.whyItMatters.map((section, index) => ({
+        ...section,
+        items: [],
+        unavailableReason: `理由その${index}`,
+      })),
+    });
+    renderSheet();
+
+    await waitFor(() => expect(screen.getByText('理由その0')).toBeTruthy());
+    expect(screen.getByText('分野史上の位置づけ')).toBeTruthy();
+  });
+
   it('fetches nothing while closed', () => {
     // 強制表示しない, and also a model call per passing card nobody asked for.
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });

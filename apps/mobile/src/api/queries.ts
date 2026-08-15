@@ -155,11 +155,15 @@ export function relationsQuery(api: ApiClient, paperId: string | null) {
  * feed. Section 8 says 強制表示しない, and prefetching an explanation for every card would
  * also be a model call per card nobody asked for.
  */
-export function explanationQuery(api: ApiClient, paperId: string | null) {
+export function explanationQuery(api: ApiClient, paperId: string | null, ready = true) {
   return {
     queryKey: queryKeys.explanation(paperId ?? ''),
     queryFn: () => api.paperExplanation(paperId as string),
-    enabled: paperId !== null,
+    // Both conditions. `paperId` is the obvious one; `ready` is the one a browser pass
+    // caught: the token is read asynchronously at start-up, so opening this sheet on a
+    // cold start sent the request without one and the reader's first ever tap on 予備知識
+    // showed 「読み込めませんでした」 for a feature that works.
+    enabled: paperId !== null && ready,
     // An explanation is cached server-side on the exact input, so re-asking is cheap — but
     // within a session the answer will not change, and refetching on focus would make the
     // sheet flicker.
@@ -168,9 +172,13 @@ export function explanationQuery(api: ApiClient, paperId: string | null) {
 }
 
 /** The inbox (spec section 26). Presets are enforced at generation; this only reads. */
-export function notificationsQuery(api: ApiClient) {
+export function notificationsQuery(api: ApiClient, enabled = true) {
   return {
     queryKey: queryKeys.notifications,
+    // Same gate as `savedQuery`, for the same reason: the token is read asynchronously at
+    // start-up, so a request sent before that comes back 401 — and a 401 here renders as
+    // "no notifications", which is the one thing an inbox must never say wrongly.
+    enabled,
     queryFn: () => api.notifications(),
   };
 }

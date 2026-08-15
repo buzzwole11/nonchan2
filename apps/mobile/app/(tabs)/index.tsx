@@ -40,7 +40,7 @@ import { useTheme } from '../../src/theme/ThemeProvider';
 export default function DiscoverScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { user } = useSession();
+  const { user, status: sessionStatus } = useSession();
   const deck = useDeck();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -341,6 +341,10 @@ export default function DiscoverScreen() {
       </View>
 
       <BeforeReadSheet
+        // The token is read asynchronously at start-up; a request sent before it lands
+        // came back 401 and the sheet said 「読み込めませんでした」 on the reader's first
+        // ever tap, for a feature that works.
+        ready={sessionStatus !== 'loading'}
         visible={beforeReadOpen}
         locale={locale}
         paperId={current?.paper.id ?? null}
