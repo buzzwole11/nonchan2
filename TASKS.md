@@ -131,9 +131,15 @@ AI が要る項目は環境制約で未着手です（DECISIONS.md D-024）。
       ラベルに書く**。開いた・訳した・状態を変えた論文は戻さない。一度戻して開かれ
       なかったら 14 日は放っておく（DECISIONS.md D-059）
 - [x] 翻訳シートからの「表現を保存」
-- [ ] 実翻訳 Provider の接続（`ExplanationProvider` 含む）— ネットワーク遮断のため未着手
-- [ ] Before you read（背景知識 3 項目、専門用語 3–5 項目）— AI 生成部分が必要
-- [ ] Why it matters（AI 生成であることの明示）— 同上
+- [ ] 実翻訳 Provider の接続 — 翻訳 API への疎通が要る（説明 Provider は接続済み、下記）
+- [x] **Before you read / Why it matters**（`providers/derived_explanation.py`,
+      `providers/anthropic_explanation.py`, `services/explanations.py`,
+      `GET /papers/{id}/explanation`, `src/discover/BeforeReadSheet.tsx`, migration `0011`）—
+      下スワイプ + ボタン（20 節のジェスチャー等価）。既定の `derived` は**論文と分類体系から
+      導けるものだけ**を返し、出せないものは理由つきで断る。`anthropic` は鍵を置けば
+      残り（学部レベルの説明・なぜ重要か 4 種）を答える。**鍵はサーバ側のみ**（25 節）。
+      すべて `ai_explanation` として別テーブルに保存し、項目ごとに出所ラベル
+      （AI 生成 / 論文本文より / 分野）を表示（DECISIONS.md D-063）
 - [x] **保存理由チップの UI**（`src/discover/saveReasons.ts`、`UndoToast.tsx`）— 保存は先に済み、
       タグは任意。既定の `interesting` はチップに出さず、どのタグを付けても残す。
       サーバが保存を確認するまでチップを出さない（未確定の行に PATCH を送らないため）

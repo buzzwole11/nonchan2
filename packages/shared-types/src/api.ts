@@ -506,3 +506,42 @@ export interface MoveTileRequest {
   x: number;
   y: number;
 }
+
+/**
+ * One piece of Before-you-read or Why-it-matters material (spec section 8).
+ *
+ * `source` says where it came from: `abstract` and `taxonomy` are things the app holds and
+ * shows verbatim; `model` is generated. Carried per item because the two arrive mixed, and
+ * section 0 requires the reader to be able to tell.
+ */
+export interface ExplanationItem {
+  kind: 'background' | 'term' | 'why';
+  title: string;
+  detail: string | null;
+  source: 'abstract' | 'taxonomy' | 'model';
+  fieldId: string | null;
+}
+
+export interface ExplanationSection {
+  kind: 'before_you_read' | 'why_it_matters';
+  /** Empty for before_you_read; one of section 8's four readings otherwise. */
+  audience: '' | 'beginner' | 'researcher' | 'application' | 'field_history';
+  items: ExplanationItem[];
+  /**
+   * Why there is nothing here, when there is nothing here. Section 8's material is
+   * 強制表示しない, so an empty section is a normal outcome and the reason is what keeps it
+   * from reading as a fault.
+   */
+  unavailableReason: string | null;
+  /** Always `ai_explanation` (spec sections 0, 8). */
+  provenanceKind: string;
+  generationProvider: string;
+  generationModel: string;
+  promptVersion: string;
+}
+
+export interface PaperExplanationResponse {
+  paperId: Uuid;
+  beforeYouRead: ExplanationSection;
+  whyItMatters: ExplanationSection[];
+}

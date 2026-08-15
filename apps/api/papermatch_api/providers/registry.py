@@ -11,13 +11,16 @@ from functools import lru_cache
 from typing import TypeVar
 
 from papermatch_api.config import Settings, get_settings
+from papermatch_api.providers.anthropic_explanation import AnthropicExplanationProvider
 from papermatch_api.providers.arxiv import ArxivPaperProvider
 from papermatch_api.providers.base import (
+    ExplanationProvider,
     FullTextProvider,
     PaperProvider,
     ProviderHealth,
     TranslationProvider,
 )
+from papermatch_api.providers.derived_explanation import DerivedExplanationProvider
 from papermatch_api.providers.mock_fulltext import MockFullTextProvider
 from papermatch_api.providers.mock_paper import MockPaperProvider
 from papermatch_api.providers.mock_translation import MockTranslationProvider
@@ -26,6 +29,7 @@ from papermatch_api.providers.openalex import OpenAlexPaperProvider
 PaperProviderFactory = Callable[[Settings], PaperProvider]
 TranslationProviderFactory = Callable[[Settings], TranslationProvider]
 FullTextProviderFactory = Callable[[Settings], FullTextProvider]
+ExplanationProviderFactory = Callable[[Settings], ExplanationProvider]
 
 PAPER_PROVIDERS: dict[str, PaperProviderFactory] = {
     "mock": lambda settings: MockPaperProvider(settings.fixtures_dir),
@@ -45,6 +49,18 @@ TRANSLATION_PROVIDERS: dict[str, TranslationProviderFactory] = {
 # gate in `services/fulltext.py`.
 FULLTEXT_PROVIDERS: dict[str, FullTextProviderFactory] = {
     "mock": lambda settings: MockFullTextProvider(settings.fixtures_dir),
+}
+
+# `derived` is the default rather than `anthropic`, and not only because it needs no key.
+# It answers what can be grounded in the paper and refuses the rest by name; the model
+# provider answers more and has to be chosen deliberately, because everything it adds is
+# generated text a reader will be shown (spec section 8).
+EXPLANATION_PROVIDERS: dict[str, ExplanationProviderFactory] = {
+    "derived": lambda _settings: DerivedExplanationProvider(),
+    "anthropic": lambda settings: AnthropicExplanationProvider(
+        api_key=settings.anthropic_api_key,
+        model=settings.explanation_model,
+    ),
 }
 
 
@@ -79,11 +95,18 @@ def get_fulltext_provider() -> FullTextProvider:
     return _resolve(FULLTEXT_PROVIDERS, settings.fulltext_provider, settings, "fulltext")
 
 
+@lru_cache(maxsize=1)
+def get_explanation_provider() -> ExplanationProvider:
+    settings = get_settings()
+    return _resolve(EXPLANATION_PROVIDERS, settings.explanation_provider, settings, "explanation")
+
+
 def reset_providers() -> None:
     """Drop cached instances. Used by tests that change configuration."""
     get_paper_provider.cache_clear()
     get_translation_provider.cache_clear()
     get_fulltext_provider.cache_clear()
+    get_explanation_provider.cache_clear()
 
 
 def health_snapshot() -> dict[str, ProviderHealth]:
@@ -92,6 +115,7 @@ def health_snapshot() -> dict[str, ProviderHealth]:
     for label, provider in (
         ("paper", get_paper_provider()),
         ("translation", get_translation_provider()),
+        ("explanation", get_explanation_provider()),
     ):
         try:
             snapshot[label] = provider.health()

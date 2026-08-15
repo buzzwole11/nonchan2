@@ -15,9 +15,13 @@ from sqlalchemy.orm import Session, selectinload
 
 from papermatch_api.db import get_db
 from papermatch_api.models import AbstractSegment, Paper
+from papermatch_api.providers.registry import get_explanation_provider
 from papermatch_api.schemas import (
     AbstractSegmentOut,
     AuthorOut,
+    ExplanationItemOut,
+    ExplanationSectionOut,
+    PaperExplanationResponse,
     PaperIdentifierOut,
     PaperListResponse,
     PaperOut,
@@ -29,6 +33,11 @@ from papermatch_api.schemas import (
     SourceProvenanceOut,
 )
 from papermatch_api.security import CurrentUser
+from papermatch_api.services.explanations import (
+    ExplanationResult,
+    before_you_read,
+    why_it_matters,
+)
 from papermatch_api.services.reading_path import routes_for
 from papermatch_api.services.relations import relations_for
 
@@ -178,6 +187,52 @@ def get_paper_relations(
             )
             for target, row in pairs
         ],
+    )
+
+
+@router.get("/papers/{paper_id}/explanation", response_model=PaperExplanationResponse)
+def get_paper_explanation(
+    paper_id: uuid.UUID,
+    user: CurrentUser,
+    db: Annotated[Session, Depends(get_db)],
+) -> PaperExplanationResponse:
+    """Section 8's Before you read and Why it matters, labelled as AI-generated.
+
+    **Requested, never pushed.** Section 8 says this material is 強制表示しない, and the
+    endpoint reflects that: it is reached by the reader asking (a downward swipe, or the
+    button beside it), not by the feed attaching an explanation to every card.
+
+    **An empty section is a normal answer.** The configured provider may be one that
+    refuses to write anything it cannot ground in the paper, or the model may have judged
+    the abstract insufficient. Either way the section comes back empty with a reason, and
+    the card is still perfectly readable — which is why this is a 200 and not a 404.
+    """
+    paper = db.get(Paper, paper_id)
+    if paper is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="paper_not_found")
+
+    provider = get_explanation_provider()
+    before = before_you_read(db, provider, paper)
+    why = why_it_matters(db, provider, paper)
+    db.commit()
+
+    return PaperExplanationResponse(
+        paper_id=paper.id,
+        before_you_read=_section(before),
+        why_it_matters=[_section(result) for result in why],
+    )
+
+
+def _section(result: ExplanationResult) -> ExplanationSectionOut:
+    return ExplanationSectionOut(
+        kind=result.kind,
+        audience=result.audience,
+        items=[ExplanationItemOut(**item) for item in result.items],
+        unavailable_reason=result.unavailable_reason,
+        provenance_kind=result.provenance_kind,
+        generation_provider=result.generation_provider,
+        generation_model=result.generation_model,
+        prompt_version=result.prompt_version,
     )
 
 

@@ -804,3 +804,41 @@ class LoginRequest(CamelModel):
 class MoveTileRequest(CamelModel):
     x: float
     y: float
+
+
+class ExplanationItemOut(CamelModel):
+    """One piece of Before-you-read or Why-it-matters material (spec section 8).
+
+    `source` says where it came from — `abstract` and `taxonomy` are things we hold,
+    `model` is generated. The distinction is carried per item rather than per section
+    because the two arrive mixed: a term lifted from the abstract and a gloss written for it
+    are different kinds of claim, and section 0 requires the reader to be able to tell.
+    """
+
+    kind: str
+    title: str
+    detail: str | None = None
+    source: str = "model"
+    field_id: str | None = None
+
+
+class ExplanationSectionOut(CamelModel):
+    kind: str
+    #: Empty for `before_you_read`; one of section 8's four readings otherwise.
+    audience: str = ""
+    items: list[ExplanationItemOut] = []
+    #: Why there is nothing here, when there is nothing here. Section 8's material is
+    #: 強制表示しない, so an empty section is a normal outcome and the reason is what stops
+    #: it reading as a fault.
+    unavailable_reason: str | None = None
+    #: Always `ai_explanation`. Sent so the client never has to infer it from the endpoint.
+    provenance_kind: str = "ai_explanation"
+    generation_provider: str = ""
+    generation_model: str = ""
+    prompt_version: str = ""
+
+
+class PaperExplanationResponse(CamelModel):
+    paper_id: uuid.UUID
+    before_you_read: ExplanationSectionOut
+    why_it_matters: list[ExplanationSectionOut]

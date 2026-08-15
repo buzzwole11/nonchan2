@@ -137,6 +137,24 @@ export const messages = {
 
     // Spec section 16 の 5 つのフィード調整。文言はすべて「今回は見送る」の側に寄せてあり、
     // 「嫌い」「興味なし」とは書きません — 押した人がそう言ったことにされないためです。
+    // 仕様書 8 節。すべて AI 生成か、論文自身からの引用で、どちらかをラベルに書きます。
+    'explain.title': '読む前に',
+    'discover.beforeRead': '予備知識',
+    'a11y.beforeReadButton': '読む前の予備知識を表示',
+    'explain.beforeYouRead': 'Before you read',
+    'explain.whyItMatters': 'なぜ重要か',
+    'explain.aiLabel': 'AI 生成',
+    'explain.quotedLabel': '論文本文より',
+    'explain.taxonomyLabel': '分野',
+    'explain.loading': '読み込んでいます…',
+    'explain.loadFailed': '読み込めませんでした。論文はそのまま読めます。',
+    'explain.retry': 'もう一度',
+    'explain.close': '閉じる',
+    'explain.audience.beginner': '初学者向け',
+    'explain.audience.researcher': '研究者向け',
+    'explain.audience.application': '応用上の意味',
+    'explain.audience.field_history': '分野史上の位置づけ',
+
     'feedback.title': '表示を調整する',
     'feedback.intro':
       'どれも取り消せます。しばらくのあいだ出方が変わるだけで、二度と出てこなくなるわけではありません。',
@@ -599,6 +617,25 @@ export const messages = {
 
     // Section 16's five feed controls. Every string sits on the 「今回は見送る」 side — none
     // of them says "dislike" or "not interested", because the reader did not say that.
+    // Spec section 8. Everything here is either AI-generated or quoted from the paper,
+    // and the label says which.
+    'explain.title': 'Before you read',
+    'discover.beforeRead': 'Before you read',
+    'a11y.beforeReadButton': 'Show background before reading',
+    'explain.beforeYouRead': 'Before you read',
+    'explain.whyItMatters': 'Why it matters',
+    'explain.aiLabel': 'AI-generated',
+    'explain.quotedLabel': 'From the abstract',
+    'explain.taxonomyLabel': 'Field',
+    'explain.loading': 'Loading…',
+    'explain.loadFailed': 'Could not load. The paper itself is unaffected.',
+    'explain.retry': 'Try again',
+    'explain.close': 'Close',
+    'explain.audience.beginner': 'For newcomers',
+    'explain.audience.researcher': 'For researchers',
+    'explain.audience.application': 'For applications',
+    'explain.audience.field_history': "In the field's development",
+
     'feedback.title': 'Adjust what you see',
     'feedback.intro':
       'All of these can be undone. They change the mix for a while; nothing is hidden for good.',

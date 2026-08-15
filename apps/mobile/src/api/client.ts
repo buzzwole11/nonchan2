@@ -39,6 +39,7 @@ import type {
   SavedPaperResponse,
   EquationGraphResponse,
   PaperRelationsResponse,
+  PaperExplanationResponse,
   ReadingPathResponse,
   SearchResponse,
   UndoResponse,
@@ -289,6 +290,11 @@ export class ApiClient {
    */
   readingPath(paperId: string): Promise<ReadingPathResponse> {
     return this.request<ReadingPathResponse>(`/papers/${paperId}/reading-path`);
+  }
+
+  /** Before you read and Why it matters, all AI-labelled (spec section 8). */
+  paperExplanation(paperId: string): Promise<PaperExplanationResponse> {
+    return this.request<PaperExplanationResponse>(`/papers/${paperId}/explanation`);
   }
 
   /** How a paper's equations depend on each other (spec section 28, Phase 7). */

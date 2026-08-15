@@ -36,6 +36,7 @@ export interface Offlineable<T> {
 }
 
 export const queryKeys = {
+  explanation: (paperId: string) => ['explanation', paperId] as const,
   saved: (sort: string) => ['saved', sort] as const,
   search: (query: string) => ['search', query] as const,
   canvas: () => ['canvas'] as const,
@@ -146,6 +147,25 @@ export function relationsQuery(api: ApiClient, paperId: string | null) {
  * Fetched when a sheet actually opens rather than with the library: four routes per row for
  * a list of fifty is fifty requests nobody asked for.
  */
+/**
+ * Before you read, and Why it matters (spec section 8).
+ *
+ * Fetched when the reader asks — the downward swipe or its button — and never with the
+ * feed. Section 8 says 強制表示しない, and prefetching an explanation for every card would
+ * also be a model call per card nobody asked for.
+ */
+export function explanationQuery(api: ApiClient, paperId: string | null) {
+  return {
+    queryKey: queryKeys.explanation(paperId ?? ''),
+    queryFn: () => api.paperExplanation(paperId as string),
+    enabled: paperId !== null,
+    // An explanation is cached server-side on the exact input, so re-asking is cheap — but
+    // within a session the answer will not change, and refetching on focus would make the
+    // sheet flicker.
+    staleTime: 30 * 60 * 1000,
+  };
+}
+
 export function readingPathQuery(api: ApiClient, paperId: string | null) {
   return {
     queryKey: queryKeys.readingPath(paperId ?? ''),

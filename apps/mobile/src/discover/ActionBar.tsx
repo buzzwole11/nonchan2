@@ -39,6 +39,16 @@ const ACTIONS: ActionSpec[] = [
     haptic: 'selection',
   },
   {
+    // Spec section 20: the downward swipe needs a button too. Placed between skip and
+    // open-source so the destructive-ish actions stay at the ends.
+    direction: 'down',
+    labelKey: 'discover.beforeRead',
+    a11yKey: 'a11y.beforeReadButton',
+    tone: 'secondary',
+    glyph: '↓',
+    haptic: 'selection',
+  },
+  {
     direction: 'up',
     labelKey: 'discover.read',
     a11yKey: 'a11y.openSourceButton',

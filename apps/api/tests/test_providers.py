@@ -54,7 +54,7 @@ def test_every_registered_provider_is_constructible() -> None:
 
 def test_health_snapshot_covers_every_active_provider() -> None:
     snapshot = health_snapshot()
-    assert set(snapshot) == {"paper", "translation"}
+    assert set(snapshot) == {"paper", "translation", "explanation"}
     assert all(h.healthy for h in snapshot.values())
 
 

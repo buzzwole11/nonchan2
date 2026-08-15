@@ -38,6 +38,15 @@ class Settings(BaseSettings):
     translation_provider: str = "mock"
     #: Section 12 restricts the maths pipeline to licensed sources; see services/fulltext.py.
     fulltext_provider: str = "mock"
+    #: Section 8's explanations. `derived` answers only what can be grounded in the paper
+    #: and names what it cannot; `anthropic` answers the rest and needs a key. The default
+    #: is the one that cannot invent anything.
+    explanation_provider: str = "derived"
+    explanation_model: str = "claude-haiku-4-5-20251001"
+    #: **Server-side only.** Spec section 25: API キーをクライアントに置かない. The mobile app
+    #: calls this API; this API calls the model. Never serialised into a response, a health
+    #: payload or the audit log.
+    anthropic_api_key: str = ""
 
     #: Sent on every outbound request. Spec section 21 asks that provider terms and
     #: acknowledgements be respected, and arXiv asks callers to identify themselves.

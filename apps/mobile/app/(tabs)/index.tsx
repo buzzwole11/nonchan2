@@ -17,6 +17,7 @@ import { PressableRow } from '../../src/components/PressableRow';
 import { Text } from '../../src/components/Text';
 import { AbstractCard } from '../../src/discover/AbstractCard';
 import { ActionBar } from '../../src/discover/ActionBar';
+import { BeforeReadSheet } from '../../src/discover/BeforeReadSheet';
 import { FeedbackSheet, type FeedbackStatus } from '../../src/discover/FeedbackSheet';
 import { SwipeDeck } from '../../src/discover/SwipeDeck';
 import { UndoToast } from '../../src/discover/UndoToast';
@@ -42,6 +43,7 @@ export default function DiscoverScreen() {
   const deck = useDeck();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [beforeReadOpen, setBeforeReadOpen] = useState(false);
   const [feedbackStatus, setFeedbackStatus] = useState<FeedbackStatus>({ kind: 'idle' });
 
   // What the server has actually accepted for the paper the toast is about. Kept here
@@ -99,8 +101,9 @@ export default function DiscoverScreen() {
         return;
       }
       if (direction === 'down') {
-        // "Before you read" is Phase 2. Until then a down swipe must not silently do
-        // nothing, so it opens the same selection affordance the card advertises.
+        // Before you read (spec section 8). Requested, never pushed — the swipe is the
+        // request, and the card stays in the deck exactly as with the upward swipe.
+        setBeforeReadOpen(true);
         return;
       }
 
@@ -287,6 +290,14 @@ export default function DiscoverScreen() {
           hapticsEnabled={user?.settings.hapticsEnabled ?? true}
         />
       </View>
+
+      <BeforeReadSheet
+        visible={beforeReadOpen}
+        locale={locale}
+        paperId={current?.paper.id ?? null}
+        paperTitle={current?.paper.title ?? null}
+        onClose={() => setBeforeReadOpen(false)}
+      />
 
       <FeedbackSheet
         visible={feedbackOpen}

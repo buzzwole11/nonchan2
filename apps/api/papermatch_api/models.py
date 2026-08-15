@@ -843,6 +843,68 @@ class PaperFullText(Base, TimestampMixin):
     retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class AbstractExplanation(Base, GenerationProvenanceMixin, TimestampMixin):
+    """Before you read, and Why it matters (spec section 8).
+
+    **Everything in this table is AI-generated and the table says so.** Spec section 8 ends
+    with AI生成であることを明示する, and section 0 requires machine explanation to be
+    distinguishable from the original in the data model, not only in the interface. That is
+    why this is a separate table rather than columns on `papers`: a join has to be asked
+    for, and nothing that reads a paper row can accidentally serve generated prose as the
+    paper's own.
+
+    **One row per (paper, kind, audience).** `before_you_read` has no audience; `why_it_
+    matters` has four, and section 8 lists them as different answers rather than one answer
+    at four lengths. Storing them separately is what lets the reader be shown the one they
+    asked for.
+
+    **`input_hash` is the cache key and the audit key at once.** The same abstract under the
+    same prompt version gives the same row, so a re-request costs nothing; and when an
+    explanation later turns out to be wrong, the hash says exactly what it was generated
+    from. A changed prompt version is a different row rather than an overwrite, because the
+    old one may already have been shown to somebody.
+    """
+
+    __tablename__ = "abstract_explanations"
+    __table_args__ = (
+        UniqueConstraint(
+            "paper_id", "kind", "audience", "prompt_version", name="uq_explanation_key"
+        ),
+        CheckConstraint(
+            "kind IN ('before_you_read', 'why_it_matters')", name="ck_explanation_kind"
+        ),
+        # `audience` is empty for `before_you_read` rather than null: the unique constraint
+        # above has to treat two rows with no audience as the same row, and in PostgreSQL
+        # two NULLs are distinct — so a nullable column here would quietly allow duplicates.
+        CheckConstraint(
+            "(kind = 'why_it_matters' AND audience <> '')"
+            " OR (kind = 'before_you_read' AND audience = '')",
+            name="ck_explanation_audience",
+        ),
+        Index("ix_explanations_paper", "paper_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UuidType, primary_key=True, default=_uuid)
+    paper_id: Mapped[uuid.UUID] = mapped_column(
+        UuidType, ForeignKey("papers.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    #: `beginner`, `researcher`, `application`, `field_history` — or '' for before_you_read.
+    audience: Mapped[str] = mapped_column(String(32), nullable=False, default="")
+    #: The items themselves. A list rather than prose so the UI can show three of five, and
+    #: so an item that turns out to be wrong can be pointed at.
+    items: Mapped[list[dict[str, Any]]] = mapped_column(JsonType, nullable=False, default=list)
+    #: Never anything else. Present as a column rather than assumed, because a reader of
+    #: this table should not have to know which tables happen to hold generated text.
+    provenance_kind: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="ai_explanation"
+    )
+    #: What the provider could not answer, kept so the absence is a fact rather than a gap.
+    #: A provider working only from what we hold cannot invent 分野史上の位置づけ, and
+    #: saying so is better than three plausible sentences nobody checked.
+    unavailable_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 class AuditLog(Base):
     """Append-only record of consequential events (spec section 0: 監査ログ).
 

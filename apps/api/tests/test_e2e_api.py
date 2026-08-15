@@ -25,7 +25,7 @@ def _auth(client: TestClient) -> dict[str, str]:
 def test_health_reports_providers_and_database(client: TestClient) -> None:
     body = client.get("/health").json()
     assert body["status"] in {"ok", "degraded"}
-    assert set(body["providers"]) == {"paper", "translation"}
+    assert set(body["providers"]) == {"paper", "translation", "explanation"}
     assert body["database"]["connected"] is True
 
 
