@@ -136,6 +136,20 @@ ODAI は **「今日は何を投稿するか」を考えるコスト** を運営
 
 > **この2週間をスキップして実装に入らないこと。** v1.1 で最も重要な決定はこれ。
 
+### 実行キット
+
+M0 はすぐ着手できる形にしてある → **[`docs/m0/`](m0/README.md)**
+
+| ファイル | 用途 |
+| --- | --- |
+| [`m0/README.md`](m0/README.md) | 運用手順・判定表・参加者募集文 |
+| [`m0/prompts.md`](m0/prompts.md) | 14日分の配信文（コピペでそのまま使える）＋ 各日の設計意図 |
+| [`m0/attendance.csv`](m0/attendance.csv) | 参加者 × 14日の出席表（一次データ） |
+| [`m0/daily-log.csv`](m0/daily-log.csv) | 日別のメモ（遅刻投稿・気づき） |
+| [`m0/interview.md`](m0/interview.md) | H-2 のヒアリング台本（n=10） |
+| [`m0/report.py`](m0/report.py) | 集計スクリプト（`python3 docs/m0/report.py`） |
+
+
 ---
 
 ## 5. 主要な設計決定
