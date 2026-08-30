@@ -1,0 +1,61 @@
+\documentclass{article}
+\usepackage{amsmath}
+\newtheorem{assumption}{Assumption}
+
+\title{A Worked Gaussian Integral}
+\author{A. Nonymous}
+
+\begin{document}
+\maketitle
+
+% A comment that must not reach the extracted prose.
+\section{Setup}
+
+We consider the one-dimensional Gaussian integral, which appears whenever a quadratic
+action is integrated out.
+
+\begin{assumption}\label{as:positive}
+The parameter $a$ is real and strictly positive, so the integral converges.
+\end{assumption}
+
+Under Assumption~\ref{as:positive} the integral is well defined and we write
+
+\begin{equation}\label{eq:definition}\tag{1}
+I(a) = \int_{-\infty}^{\infty} e^{-a x^{2}}\,dx
+\end{equation}
+
+where $a$ is the inverse width of the Gaussian, and $x$ is the integration variable.
+
+\section{Evaluation}
+
+Squaring \eqref{eq:definition} and renaming the variable in the second factor gives
+
+\begin{equation}\label{eq:squared}\tag{2}
+I(a)^{2} = \int_{-\infty}^{\infty}\int_{-\infty}^{\infty} e^{-a(x^{2}+y^{2})}\,dx\,dy
+\end{equation}
+
+which is a two-dimensional integral over the whole plane.
+
+Changing to polar coordinates, so that $r$ is the radial coordinate and $\theta$ is the
+polar angle, we obtain
+
+\begin{equation}\label{eq:polar}\tag{3}
+I(a)^{2} = \int_{0}^{2\pi}\int_{0}^{\infty} e^{-a r^{2}} r\,dr\,d\theta
+\end{equation}
+
+The angular integral contributes a factor of $2\pi$ and the radial integral is elementary,
+so that
+
+\begin{equation}\label{eq:result}\tag{4}
+I(a) = \sqrt{\frac{\pi}{a}}
+\end{equation}
+
+which is the standard result quoted in \eqref{eq:definition}.
+
+An unnumbered aside, which the extractor should keep but not number:
+
+\begin{equation*}
+\lim_{a \to \infty} I(a) = 0
+\end{equation*}
+
+\end{document}

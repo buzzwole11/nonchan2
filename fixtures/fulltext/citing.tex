@@ -1,0 +1,53 @@
+% Synthetic LaTeX for the citation-extraction tests (spec section 17). CC0-1.0.
+%
+% This document exists to be a paper that *refers to other papers*, which none of the other
+% fixtures do. It carries one of each kind of reference the extractor is allowed to match —
+% identifier, author-and-year, near-complete title — and several that it must refuse.
+%
+% Unlike the other fixtures, its manifest entry is keyed to a paper that actually exists in
+% `fixtures/papers.sample.json` (`arxiv:2604.14247`), and every paper it refers to is in that
+% corpus too. That is what lets `services/mentions` produce real relations from `make seed`
+% rather than from a document whose references point at nothing.
+\documentclass{article}
+\usepackage{amsmath}
+
+\title{Large Deviations in Log-Concave Models}
+\author{M. Zubkov \and F. Castellanos \and R. Xu \and K. Sasaki}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+
+% Refers by arXiv identifier: the strongest form the extractor recognises.
+% Target: "Concentration for Non-Reversible Measures" (2026), arXiv:2612.10959.
+The evaluation in arXiv:2612.10959 obtains the deviation constant by a spectral argument,
+and we follow that route here.
+
+% Refers by surname and year together, and draws a contrast. Neither half of the reference
+% may match alone, and the contrastive cue is what lets `relations.classify` reach the
+% `contrasting` label at all.
+% Target: "Thresholds for Sparse Subgraphs" (2026), R. Almeida.
+In contrast to Almeida (2026), we do not require the threshold to be sharp, and the bound
+therefore extends to the degenerate case.
+
+% Refers by a nearly complete title, and the title is long enough to be distinctive.
+% Target: "Improved Bounds for Off-Diagonal Ramsey Numbers" (2025).
+The paper Improved Bounds for Off-Diagonal Ramsey Numbers treats the multi-dimensional case.
+
+% A title too short to be distinctive. Must not match: "Sublinear Geometric Estimation"
+% contributes three usable words, and any sentence about estimating geometry contains them.
+The paper Sublinear Geometric Estimation treats only the one-dimensional case.
+
+\section{Discussion}
+
+% A year with no surname. Must not match anything.
+Earlier treatments from 2026 used a different normalisation.
+
+% A surname with no year. Must not match anything.
+The argument of Almeida is standard.
+
+% A contrastive phrase in a sentence that refers to nobody. Must not attach to any paper.
+Unlike the usual presentation, we keep the constant explicit throughout.
+
+\end{document}

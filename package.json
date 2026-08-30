@@ -1,0 +1,51 @@
+{
+  "name": "papermatch",
+  "private": true,
+  "version": "0.1.0",
+  "description": "PaperMatch monorepo \u2014 Abstract discovery, partial translation, formula understanding, and knowledge canvas for academic papers.",
+  "workspaces": [
+    "packages/*",
+    "apps/mobile"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "eslint .",
+    "fixtures:generate": "node scripts/generate-fixtures.mjs",
+    "web": "npm run web --workspace apps/mobile",
+    "visual": "node scripts/visual-regression.mjs",
+    "visual:update": "node scripts/visual-regression.mjs --update",
+    "api:dev": "cd apps/api && uv run uvicorn papermatch_api.main:app --reload --port 8000",
+    "api:test": "cd apps/api && uv run pytest",
+    "db:up": "docker compose up -d db redis",
+    "db:migrate": "cd apps/api && uv run alembic upgrade head",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "katex:build": "node scripts/build-katex-runtime.mjs",
+    "mathjax:build": "node scripts/build-mathjax-runtime.mjs",
+    "mobile": "npm run start --workspace @papermatch/mobile",
+    "mobile:clear": "npm run start:clear --workspace @papermatch/mobile",
+    "ci": "bash scripts/ci-local.sh"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "~57.0.1",
+    "eslint-config-prettier": "^10.1.8",
+    "katex": "^0.18.1",
+    "mathjax": "3.2.2",
+    "pixelmatch": "^7.2.0",
+    "playwright": "^1.62.1",
+    "pngjs": "^7.0.0",
+    "prettier": "^3.9.6",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.65.0"
+  },
+  "overrides": {
+    "react-native-worklets": "0.10.1"
+  }
+}

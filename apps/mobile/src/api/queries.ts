@@ -1,0 +1,235 @@
+/**
+ * Data fetching for the screens that read rather than swipe (spec sections 25, 26).
+ *
+ * These screens used to fetch in an effect and write the result into three pieces of state
+ * — the rows, a loading flag, and an offline flag. React Compiler flags that pattern
+ * (`react-hooks/set-state-in-effect`) and it was suppressed a line at a time; this is the
+ * actual fix rather than the suppression.
+ *
+ * **The offline fallback is inside the query function, not around it.** Section 25 requires
+ * 外部API失敗時もキャッシュ済みフィードを表示 and section 26 wants saved content readable with
+ * no network at all. React Query's cache is in memory, so it is empty the moment the app is
+ * killed — which is exactly when someone opens the app on a train. The AsyncStorage cache is
+ * what survives that, and it stays where it was.
+ *
+ * **Offline is part of the data, not a second state.** Returning `{ rows, offline }` from one
+ * function means the flag and the rows always came from the same attempt. Kept apart, they
+ * can disagree for a render — showing fresh rows under an "offline" banner, or the reverse —
+ * and that disagreement is invisible until someone reports it.
+ *
+ * **A 4xx is not an outage.** `NetworkError` means the request never landed and cached
+ * content is the honest answer. Any other failure means the server replied and said no;
+ * serving a cache for that would hide a real error behind stale rows.
+ */
+import { QueryClient } from '@tanstack/react-query';
+
+import type { SavedEntry } from '@papermatch/shared-types';
+
+import { NetworkError } from './client';
+import type { ApiClient } from './client';
+import { cacheSaved, readCachedSaved } from '../offline/cache';
+
+/** Rows plus how they were obtained, so the two can never disagree. */
+export interface Offlineable<T> {
+  rows: T;
+  offline: boolean;
+}
+
+export const queryKeys = {
+  explanation: (paperId: string) => ['explanation', paperId] as const,
+  notifications: ['notifications'] as const,
+  saved: (sort: string) => ['saved', sort] as const,
+  search: (query: string) => ['search', query] as const,
+  canvas: () => ['canvas'] as const,
+  expressions: () => ['expressions'] as const,
+  review: () => ['review'] as const,
+  mathCards: () => ['math-cards'] as const,
+  mathCard: (id: string) => ['math-card', id] as const,
+  relations: (paperId: string) => ['relations', paperId] as const,
+  readingPath: (paperId: string) => ['reading-path', paperId] as const,
+  equationGraph: (paperId: string) => ['equation-graph', paperId] as const,
+};
+
+export function createQueryClient(): QueryClient {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        // A screen that refetches on every focus makes the abstract list flicker for no new
+        // information; these lists change when the reader changes them, not on their own.
+        refetchOnWindowFocus: false,
+        // Retrying a network failure fights the offline fallback: the query function has
+        // already substituted cached rows, so a retry would replace them with the same
+        // cached rows a second later, having spent the time.
+        retry: false,
+        staleTime: 30_000,
+      },
+    },
+  });
+}
+
+export function savedQuery(api: ApiClient, sort: string, enabled = true) {
+  return {
+    queryKey: queryKeys.saved(sort),
+    // The token is read asynchronously at start-up (see `SessionProvider`), so a cold start
+    // straight into this screen would otherwise send the request without one. The 401 came
+    // back as an empty list and the screen said 「まだ保存した論文はありません」 to a reader
+    // whose library was full.
+    enabled,
+    queryFn: async (): Promise<Offlineable<{ saved: SavedEntry[]; total: number }>> => {
+      try {
+        const response = await api.saved({ sort: sort as never, limit: 50 });
+        void cacheSaved(response.saved, response.total);
+        return { rows: { saved: response.saved, total: response.total }, offline: false };
+      } catch (error) {
+        if (!(error instanceof NetworkError)) throw error;
+        const cached = await readCachedSaved();
+        return {
+          rows: { saved: cached?.saved ?? [], total: cached?.total ?? 0 },
+          offline: true,
+        };
+      }
+    },
+  };
+}
+
+/**
+ * Search the saved library (spec section 24, D-041).
+ *
+ * There is deliberately **no offline fallback here**, unlike `savedQuery`. Substring
+ * matching over the AsyncStorage cache would be easy and would quietly answer a different
+ * question: the cache holds one page of one sort order, so an offline search would report
+ * "nothing matches" for a paper the reader definitely saved. Saying "search needs a
+ * connection" is the honest answer; the cached library is still listed underneath.
+ *
+ * `enabled` keeps a blank box from making a request. The server also treats blank as "not
+ * asked yet" — the check exists in both places because the client one saves a round trip
+ * and the server one is the definition.
+ */
+export function searchQuery(api: ApiClient, query: string, ready = true) {
+  const trimmed = query.trim();
+  return {
+    queryKey: queryKeys.search(trimmed),
+    queryFn: () => api.searchSaved(trimmed),
+    enabled: trimmed.length > 0 && ready,
+  };
+}
+
+/**
+ * The Canvas plane (spec section 13).
+ *
+ * No offline fallback: the plane's coordinates are created on the server the first time a
+ * paper is placed, so there is nothing meaningful to serve from a cache that has never
+ * seen them. Saved is the surface that works without a connection.
+ */
+export function canvasQuery(api: ApiClient) {
+  return {
+    queryKey: queryKeys.canvas(),
+    queryFn: () => api.canvas(),
+  };
+}
+
+/**
+ * How the selected paper sits among the reader's library (spec section 17).
+ *
+ * `enabled` on a selection: with nothing selected there is no anchor, and asking the server
+ * for the relations of nothing is a request that can only be answered with an error.
+ */
+export function relationsQuery(api: ApiClient, paperId: string | null) {
+  return {
+    queryKey: queryKeys.relations(paperId ?? ''),
+    queryFn: () => api.paperRelations(paperId as string),
+    enabled: paperId !== null,
+  };
+}
+
+/**
+ * The four routes through a paper (spec section 17).
+ *
+ * Fetched when a sheet actually opens rather than with the library: four routes per row for
+ * a list of fifty is fifty requests nobody asked for.
+ */
+/**
+ * Before you read, and Why it matters (spec section 8).
+ *
+ * Fetched when the reader asks — the downward swipe or its button — and never with the
+ * feed. Section 8 says 強制表示しない, and prefetching an explanation for every card would
+ * also be a model call per card nobody asked for.
+ */
+export function explanationQuery(api: ApiClient, paperId: string | null, ready = true) {
+  return {
+    queryKey: queryKeys.explanation(paperId ?? ''),
+    queryFn: () => api.paperExplanation(paperId as string),
+    // Both conditions. `paperId` is the obvious one; `ready` is the one a browser pass
+    // caught: the token is read asynchronously at start-up, so opening this sheet on a
+    // cold start sent the request without one and the reader's first ever tap on 予備知識
+    // showed 「読み込めませんでした」 for a feature that works.
+    enabled: paperId !== null && ready,
+    // An explanation is cached server-side on the exact input, so re-asking is cheap — but
+    // within a session the answer will not change, and refetching on focus would make the
+    // sheet flicker.
+    staleTime: 30 * 60 * 1000,
+  };
+}
+
+/** The inbox (spec section 26). Presets are enforced at generation; this only reads. */
+export function notificationsQuery(api: ApiClient, enabled = true) {
+  return {
+    queryKey: queryKeys.notifications,
+    // Same gate as `savedQuery`, for the same reason: the token is read asynchronously at
+    // start-up, so a request sent before that comes back 401 — and a 401 here renders as
+    // "no notifications", which is the one thing an inbox must never say wrongly.
+    enabled,
+    queryFn: () => api.notifications(),
+  };
+}
+
+export function readingPathQuery(api: ApiClient, paperId: string | null) {
+  return {
+    queryKey: queryKeys.readingPath(paperId ?? ''),
+    queryFn: () => api.readingPath(paperId as string),
+    enabled: paperId !== null,
+  };
+}
+
+/** How a paper's equations depend on each other (spec section 28, Phase 7). */
+export function equationGraphQuery(api: ApiClient, paperId: string | null) {
+  return {
+    queryKey: queryKeys.equationGraph(paperId ?? ''),
+    queryFn: () => api.equationGraph(paperId as string),
+    enabled: paperId !== null,
+  };
+}
+
+/** The Learn tab's two lists, fetched together because the screen shows them together. */
+export function learnQuery(api: ApiClient) {
+  return {
+    queryKey: queryKeys.review(),
+    queryFn: async () => {
+      const [queue, list] = await Promise.all([
+        api.reviewQueue(5),
+        api.expressions({ limit: 100 }),
+      ]);
+      return {
+        due: queue.due,
+        totalDue: queue.totalDue,
+        expressions: list.expressions,
+        total: list.total,
+      };
+    },
+  };
+}
+
+export function mathCardsQuery(api: ApiClient) {
+  return {
+    queryKey: queryKeys.mathCards(),
+    queryFn: async () => (await api.mathCards({ limit: 20 })).cards,
+  };
+}
+
+export function mathCardQuery(api: ApiClient, id: string) {
+  return {
+    queryKey: queryKeys.mathCard(id),
+    queryFn: () => api.mathCard(id),
+    enabled: id !== '',
+  };
+}

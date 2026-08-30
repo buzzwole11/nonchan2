@@ -1,0 +1,174 @@
+{
+  "$comment": [
+    "A recorded-shape OpenAlex /works response, hand-authored from the schema documented",
+    "at https://docs.openalex.org/api-entities/works/work-object rather than captured from",
+    "a live call, because this environment cannot reach OpenAlex (DECISIONS.md D-016).",
+    "Titles, abstracts and author names are synthetic; the structure — the inverted index,",
+    "authorships, primary_topic, best_oa_location, open_access, ids, meta.next_cursor — is",
+    "the real shape, and that is what the parser is tested against.",
+    "Work 3 has an unrecognised licence and work 4 has no abstract, so the licence rule and",
+    "the no-abstract rule are both exercised."
+  ],
+  "meta": {
+    "count": 8421,
+    "db_response_time_ms": 42,
+    "page": null,
+    "per_page": 4,
+    "next_cursor": "IlsxNzA5MTY0ODAwMDAwLCAnaHR0cHM6Ly9vcGVuYWxleC5vcmcvVzQzOTAyJ10i"
+  },
+  "results": [
+    {
+      "id": "https://openalex.org/W4390211873",
+      "doi": "https://doi.org/10.1103/PhysRevB.109.045139",
+      "title": "Topological Edge Modes in Kagome Lattices",
+      "display_name": "Topological Edge Modes in Kagome Lattices",
+      "publication_year": 2026,
+      "publication_date": "2026-01-24",
+      "type": "article",
+      "is_retracted": false,
+      "ids": {
+        "openalex": "https://openalex.org/W4390211873",
+        "doi": "https://doi.org/10.1103/PhysRevB.109.045139",
+        "arxiv": "https://arxiv.org/abs/2511.08822"
+      },
+      "abstract_inverted_index": {
+        "Topological": [0],
+        "invariants": [1],
+        "classify": [2],
+        "insulating": [3],
+        "phases.": [4],
+        "Whether": [5],
+        "the": [6, 14, 21],
+        "observed": [7],
+        "gap": [8],
+        "is": [9],
+        "topological": [10],
+        "has": [11],
+        "not": [12],
+        "been": [13],
+        "settled.": [15],
+        "We": [16],
+        "compute": [17],
+        "a": [18],
+        "Chern": [19],
+        "number": [20],
+        "numerically.": [22]
+      },
+      "authorships": [
+        {
+          "author": {
+            "id": "https://openalex.org/A5023888888",
+            "display_name": "N. Quesada",
+            "orcid": "https://orcid.org/0000-0002-1825-0097"
+          },
+          "institutions": [{ "display_name": "Institute for Theoretical Physics" }]
+        },
+        {
+          "author": { "id": "https://openalex.org/A5023777777", "display_name": "D. Ueda", "orcid": null },
+          "institutions": []
+        }
+      ],
+      "primary_topic": {
+        "id": "https://openalex.org/T10123",
+        "display_name": "Topological insulators and semimetals",
+        "subfield": { "display_name": "Condensed Matter Physics" },
+        "field": { "display_name": "Condensed Matter Physics" }
+      },
+      "open_access": { "is_oa": true, "oa_status": "green", "oa_url": "https://arxiv.org/pdf/2511.08822" },
+      "best_oa_location": {
+        "license": "cc-by",
+        "landing_page_url": "https://arxiv.org/abs/2511.08822",
+        "pdf_url": "https://arxiv.org/pdf/2511.08822"
+      },
+      "primary_location": {
+        "license": "cc-by",
+        "landing_page_url": "https://link.example.org/PhysRevB.109.045139",
+        "source": { "id": "https://openalex.org/S123", "display_name": "Physical Review B" }
+      }
+    },
+    {
+      "id": "https://openalex.org/W4390299991",
+      "doi": null,
+      "display_name": "Sample-Efficient Model-Based Reinforcement Learning",
+      "publication_year": 2025,
+      "publication_date": "2025-11-02",
+      "type": "preprint",
+      "is_retracted": false,
+      "ids": { "openalex": "https://openalex.org/W4390299991" },
+      "abstract_inverted_index": {
+        "Model-based": [0],
+        "agents": [1],
+        "learn": [2],
+        "a": [3, 12],
+        "dynamics": [4],
+        "model.": [5],
+        "Reported": [6],
+        "gains": [7],
+        "vanish": [8],
+        "under": [9],
+        "matched": [10],
+        "budgets.": [11],
+        "controlled": [13],
+        "study": [14],
+        "follows.": [15]
+      },
+      "authorships": [
+        { "author": { "display_name": "M. Xu", "orcid": null }, "institutions": [] }
+      ],
+      "primary_topic": {
+        "display_name": "Reinforcement learning",
+        "subfield": { "display_name": "Artificial Intelligence" },
+        "field": { "display_name": "Artificial Intelligence" }
+      },
+      "open_access": { "is_oa": true, "oa_status": "gold" },
+      "best_oa_location": { "license": "cc0", "landing_page_url": "https://example.org/w4390299991", "pdf_url": null },
+      "primary_location": { "license": "cc0", "landing_page_url": "https://example.org/w4390299991", "source": { "display_name": "Open Preprints" } }
+    },
+    {
+      "id": "https://openalex.org/W4390300002",
+      "doi": "https://doi.org/10.1000/unclear.terms.1",
+      "display_name": "A Paper Whose Licence We Cannot Name",
+      "publication_year": 2024,
+      "publication_date": "2024-05-05",
+      "type": "article",
+      "is_retracted": false,
+      "ids": { "openalex": "https://openalex.org/W4390300002", "doi": "https://doi.org/10.1000/unclear.terms.1" },
+      "abstract_inverted_index": {
+        "This": [0],
+        "abstract": [1],
+        "exists": [2],
+        "but": [3],
+        "its": [4],
+        "terms": [5],
+        "are": [6],
+        "not": [7],
+        "recognised.": [8]
+      },
+      "authorships": [{ "author": { "display_name": "C. Delacroix", "orcid": null }, "institutions": [] }],
+      "primary_topic": { "display_name": "Number theory", "subfield": { "display_name": "Algebra and Number Theory" }, "field": { "display_name": "Algebra and Number Theory" } },
+      "open_access": { "is_oa": false, "oa_status": "closed" },
+      "best_oa_location": null,
+      "primary_location": {
+        "license": "publisher-specific-oa",
+        "landing_page_url": "https://publisher.example.org/unclear",
+        "source": { "display_name": "Journal of Unclear Terms" }
+      }
+    },
+    {
+      "id": "https://openalex.org/W4390300003",
+      "doi": "https://doi.org/10.1000/no.abstract.1",
+      "display_name": "A Work With No Abstract At All",
+      "publication_year": 2023,
+      "publication_date": "2023-03-03",
+      "type": "article",
+      "is_retracted": true,
+      "ids": { "openalex": "https://openalex.org/W4390300003" },
+      "abstract_inverted_index": null,
+      "authorships": [],
+      "primary_topic": null,
+      "open_access": { "is_oa": false, "oa_status": "closed" },
+      "best_oa_location": null,
+      "primary_location": null
+    }
+  ]
+}

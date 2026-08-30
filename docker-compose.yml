@@ -1,0 +1,36 @@
+name: papermatch
+
+services:
+  db:
+    # pgvector image rather than plain postgres: Phase 3 adds the vector column and index
+    # (DECISIONS.md D-006), and having the extension available from Phase 0 means that
+    # migration does not also require a change of environment.
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: papermatch
+      POSTGRES_PASSWORD: papermatch
+      POSTGRES_DB: papermatch
+    ports:
+      - '5432:5432'
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./infra/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U papermatch -d papermatch']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    # Queues and provider-response cache (spec section 22). Not used by Phase 0 code yet.
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  db-data:

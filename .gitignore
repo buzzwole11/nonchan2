@@ -1,0 +1,43 @@
+# Node
+node_modules/
+npm-debug.log*
+.expo/
+.expo-shared/
+dist/
+web-build/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Local data
+*.sqlite3
+/tmp-artifacts/
+
+# Written by `expo start` if it is ever run from the repository root by mistake. The
+# workspaces extend tsconfig.base.json; a root tsconfig.json here is litter, not config.
+/tsconfig.json
+
+# Written by `npm run visual` when a case differs: the current rendering and a diff image.
+# The baselines next to it are committed; these are the evidence for one failing run.
+/apps/mobile/visual-output/
