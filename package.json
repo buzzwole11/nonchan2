@@ -19,7 +19,7 @@
     "web": "npm run web --workspace apps/mobile",
     "visual": "node scripts/visual-regression.mjs",
     "visual:update": "node scripts/visual-regression.mjs --update",
-    "api:dev": "cd apps/api && uv run uvicorn papermatch_api.main:app --reload --port 8000",
+    "api:dev": "cd apps/api && uv run uvicorn papermatch_api.main:app --reload --host 0.0.0.0 --port 8000",
     "api:test": "cd apps/api && uv run pytest",
     "db:up": "docker compose up -d db redis",
     "db:migrate": "cd apps/api && uv run alembic upgrade head",

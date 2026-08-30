@@ -31,6 +31,20 @@ from papermatch_api.schemas import error_response
 
 logger = logging.getLogger("papermatch")
 
+#: Origins on a private network (RFC 1918 and link-local), any port. Used only in
+#: development — see ``create_app``. Deliberately not a blanket ``.*``: a development
+#: machine also browses the public internet, and a page out there should not be able to
+#: read a developer's local corpus and session.
+PRIVATE_LAN_ORIGIN = (
+    r"^https?://("
+    r"10\.\d{1,3}\.\d{1,3}\.\d{1,3}"
+    r"|192\.168\.\d{1,3}\.\d{1,3}"
+    r"|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}"
+    r"|169\.254\.\d{1,3}\.\d{1,3}"
+    r"|[a-zA-Z0-9-]+\.local"
+    r")(:\d+)?$"
+)
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -58,9 +72,15 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # In development the Expo dev server may be opened from another device on the same
+    # network — a phone checking layouts on a real screen — and that arrives as a private-LAN
+    # origin the fixed list cannot name in advance. The regex is added only outside
+    # production-like environments, so a deployed API still answers the configured origins
+    # and nothing else. Native builds are unaffected either way: CORS is a browser rule.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_allow_origins,
+        allow_origin_regex=None if settings.is_production_like else PRIVATE_LAN_ORIGIN,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

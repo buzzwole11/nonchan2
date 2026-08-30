@@ -23,8 +23,6 @@
     "experiments": {
       "typedRoutes": true
     },
-    "extra": {
-      "apiBaseUrl": "http://localhost:8000"
-    }
+    "extra": {}
   }
 }

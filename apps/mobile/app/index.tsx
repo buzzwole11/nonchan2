@@ -13,7 +13,7 @@
  * exactly what someone is trying to open when the API is missing.
  */
 import { Link, Redirect } from 'expo-router';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Platform, View } from 'react-native';
 
 import { apiBaseUrl } from '../src/api/useApi';
 import { useSession } from '../src/api/session';
@@ -83,9 +83,11 @@ function Centred({ children }: { children: React.ReactNode }) {
  * Where the app is trying to connect, and a way into the formula-renderer check.
  *
  * The address is worth showing during development because the commonest way to get stuck
- * here is invisible otherwise: `localhost` on a phone means the phone, so the default
- * points the app at itself and it waits for a server that is on the developer's machine.
- * Printing it turns "nothing happens" into "it is asking the wrong host".
+ * here is invisible otherwise: `localhost` on a phone means the phone, so an app pointed
+ * there waits for a server that is on the developer's machine. `apiBaseUrl` now follows the
+ * Expo dev server's host, which removes that case — but a tunnel, or a build with no dev
+ * server behind it, can still land on localhost, and on a phone that is always wrong.
+ * Printing the address turns "nothing happens" into "it is asking the wrong host".
  *
  * `__DEV__` is false in a production build, so none of this ships.
  */
@@ -94,7 +96,8 @@ function DevDiagnostics() {
   if (!__DEV__) return null;
 
   const base = apiBaseUrl();
-  const pointingAtItself = /\/\/(localhost|127\.0\.0\.1)\b/.test(base);
+  // On the web the browser and the API share a machine, so localhost is the right answer.
+  const pointingAtItself = Platform.OS !== 'web' && /\/\/(localhost|127\.0\.0\.1)\b/.test(base);
 
   return (
     <View style={{ alignItems: 'center', gap: theme.spacing.xs }}>
@@ -103,8 +106,8 @@ function DevDiagnostics() {
       </Text>
       {pointingAtItself && (
         <Text variant="caption" tone="warning" style={{ textAlign: 'center' }}>
-          実機では localhost は端末自身を指します。apps/mobile/app.json の expo.extra.apiBaseUrl
-          を開発マシンの LAN IP に変えてください。
+          実機では localhost は端末自身を指します。開発サーバーの host を取得できていません。
+          apps/mobile/app.json の expo.extra.apiBaseUrl に開発マシンの LAN IP を書いてください。
         </Text>
       )}
       <Link href="/dev/math" asChild>

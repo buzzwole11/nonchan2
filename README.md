@@ -65,7 +65,7 @@ curl -s "localhost:8000/math-cards/$ID?includeUnverified=true" | jq '.hiddenStep
 | --- | --- | --- |
 | 1 | **egress の許可**: Claude Code の設定 → 機能 → 追加の許可ドメインに `export.arxiv.org` と `api.openalex.org` を追加し、**その後で新しいセッションを開く**（許可はコンテナ起動時に読まれるため、既存セッションには反映されません） | 実データの取り込み、疎通、100 件でのフィード構成。まとめて `cli live-check` 1 コマンドで確認できます（下記） |
 | 2 | **API 鍵**: 環境変数 `PAPERMATCH_ANTHROPIC_API_KEY` を設定し、`PAPERMATCH_TRANSLATION_PROVIDER=anthropic` `PAPERMATCH_EXPLANATION_PROVIDER=anthropic` にする | 実翻訳（6 段階すべて）、Before you read の生成部分、Why it matters の 4 種。鍵はサーバ側だけに置く（仕様書 25 節） |
-| 3 | **実機**: 手元のマシンで `npm install && npm run mobile`、Expo Go で開く | TASKS.md の実機チェックリスト（文タップ選択、WebView の数式、VoiceOver、Dynamic Type、機内モード）と Maestro E2E |
+| 3 | **実機**: 手元のマシンで `make setup && make db-up && make seed`、`make api` と `make mobile` を起動し、Expo Go で QR を読む（[実機で開く](#実機expo-go-で開く)。設定の書き換えは不要） | TASKS.md の実機チェックリスト（文タップ選択、WebView の数式、VoiceOver、Dynamic Type、機内モード）と Maestro E2E |
 | 4 | **push 配信**（任意）: APNs / FCM などの配信チャネルを接続する | 通知が受信箱に加えて端末にも届く。プリセット・静音時間・1日1回は生成時に適用済みなので、チャネル側の判断は不要（`notifications` テーブルの行を送るだけ） |
 
 この環境の egress 拒否は組織ポリシーの 403 で、回避はしません（proxy の指示どおり報告のみ）。1 と 2 は [claude.ai/code](https://claude.ai/code) の環境設定から変更できます。
@@ -196,7 +196,22 @@ make api      # http://localhost:8000  （/docs に OpenAPI UI）
 make mobile   # Expo dev server
 ```
 
-モバイルアプリの接続先は `apps/mobile/app.json` の `expo.extra.apiBaseUrl` です。実機から繋ぐ場合は開発マシンの LAN IP に変更してください。
+### 実機（Expo Go）で開く
+
+スマホと開発マシンを同じ Wi-Fi に置き、`make mobile` が出す QR を Expo Go で読むだけです。**設定の書き換えは要りません** — アプリは Expo 開発サーバーの host をそのまま API の宛先に使い、`make api` は LAN に bind します。接続先はアプリの最初の画面に表示されるので、想定と違えばその場で分かります。
+
+繋がらないときの切り分け:
+
+- スマホのブラウザで `http://<開発マシンの IP>:8000/health` を開く。ここが駄目ならファイアウォール（macOS の「ローカルネットワーク」許可、Windows Defender の受信規則）です。
+- `expo start --tunnel` を使う場合だけは自動判別が効きません（公開ホスト名は Metro のポートしか通さないため）。`apps/mobile/app.json` の `expo.extra.apiBaseUrl` に明示してください。この項目は staging / production ビルドの向き先を指定する場所でもあり、設定されていればそちらが優先されます。
+
+Android のワイヤレスデバッグ（logcat や `expo start --android` を使いたいとき）:
+
+```bash
+adb pair <IP>:<ペア設定ポート>   # 「ペア設定コードでペア設定」の画面に出る番号
+adb connect <IP>:<接続ポート>    # ワイヤレスデバッグ画面のポート。切り替えるたびに変わります
+adb devices
+```
 
 ### make が無い環境（Windows など）
 

@@ -40,8 +40,11 @@ fixtures: ## Regenerate fixtures/papers.sample.json
 	node scripts/generate-fixtures.mjs
 
 .PHONY: api
-api: ## Run the API with reload on :8000
-	cd $(API) && $(UV) run uvicorn papermatch_api.main:app --reload --port 8000
+api: ## Run the API with reload on :8000, reachable from a phone on the same network
+	# --host 0.0.0.0 because uvicorn otherwise binds the loopback only, and a phone running
+	# the app over Wi-Fi is not on the loopback. This is a development target: it puts the
+	# dev API on whatever network the machine is joined to, so use it on a network you trust.
+	cd $(API) && $(UV) run uvicorn papermatch_api.main:app --reload --host 0.0.0.0 --port 8000
 
 .PHONY: mobile
 mobile: ## Start the Expo dev server
